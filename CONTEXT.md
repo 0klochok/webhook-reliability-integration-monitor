@@ -22,14 +22,14 @@ When information is unknown, write `TBD` and add it to **18. Open questions**. D
 
 ## 1. Meta
 
-| Field | Value |
-|---|---|
-| Last updated | YYYY-MM-DD |
-| Owner | <name/team> |
-| Status | draft \| active \| frozen |
-| Current phase | discovery \| build \| stabilization \| production \| maintenance |
-| Repository | <repo name / URL> |
-| Primary runtime | <local / staging / production / other> |
+| Field           | Value                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------- |
+| Last updated    | 2026-06-20                                                                                                    |
+| Owner           | Local project owner                                                                                           |
+| Status          | active                                                                                                        |
+| Current phase   | Phase 0 — Foundation                                                                                          |
+| Repository      | webhook-reliability-integration-monitor / https://github.com/0klochok/webhook-reliability-integration-monitor |
+| Primary runtime | local                                                                                                         |
 
 ### Status meanings
 
@@ -41,26 +41,25 @@ When information is unknown, write `TBD` and add it to **18. Open questions**. D
 
 ## 2. System overview
 
-- **Product domain:**
-- **Primary users:**
-- **Problem solved:**
-- **High-level architecture:**
-- **Current architecture:**
-- **Current phase:**
+- **Product domain:** Reliable webhook integrations for business automations.
+- **Primary users:** Developers and operators evaluating webhook reliability patterns.
+- **Problem solved:** Demonstrates planned durable webhook ingestion, idempotency, retries, dead-letter handling, replay, and health visibility.
+- **High-level architecture:** Provider webhook -> Hono ingress -> adapter -> validation/signature checks -> PostgreSQL storage -> BullMQ worker/retry flow -> dashboard/replay.
+- **Current architecture:** Phase 0 pnpm workspace scaffold with local PostgreSQL and Redis Docker Compose only.
+- **Current phase:** Phase 0 — repository foundation.
 - **Main runtime surfaces:**
-  - Frontend/UI:
-  - Backend/API:
-  - Workers/jobs:
-  - CLI/scripts:
-  - External integrations:
+  - Frontend/UI: planned server-rendered Hono dashboard in `apps/api`.
+  - Backend/API: planned Hono API in `apps/api`.
+  - Workers/jobs: planned BullMQ worker in `apps/worker`.
+  - CLI/scripts: planned local simulator in `tools/simulator`.
+  - External integrations: mock/local-only by default; real provider APIs are disabled unless explicitly approved.
 - **Critical user-visible flows:**
   1.
   2.
   3.
 - **Core modules:**
   - `<module>`:
-- **Non-goals / out of scope:**
-  -
+- ## **Non-goals / out of scope:**
 
 ---
 
@@ -68,17 +67,17 @@ When information is unknown, write `TBD` and add it to **18. Open questions**. D
 
 Use this section to define document responsibility and avoid conflicting instructions.
 
-| File | Responsibility | Update trigger |
-|---|---|---|
-| `README.md` | Setup, quickstart, common developer entry points | Install/dev workflow changes |
-| `REQ.md` | Product requirements, user stories, acceptance criteria | Requirement or scope changes |
-| `DESIGN.md` | Technical design, architecture, trade-offs, diagrams | Design or architecture changes |
-| `CONTEXT.md` | Current project context, stack, repo map, commands, constraints | Any implementation-context change |
-| `STATE.md` | Current implementation state, completed work, next actions | Progress changes after meaningful work |
-| `TDD.md` | Test strategy, test cases, acceptance checks, quality gate | Test strategy or coverage changes |
-| `RUNBOOK.md` | Operations, deployment, rollback, incidents, recovery | Operational procedure changes |
-| `AGENTS.md` | Agent-specific working rules, codebase conventions, automation constraints | Agent workflow or convention changes |
-| `ADR/` or `docs/adr/` | Durable architecture decisions | Significant irreversible or costly decisions |
+| File                  | Responsibility                                                             | Update trigger                               |
+| --------------------- | -------------------------------------------------------------------------- | -------------------------------------------- |
+| `README.md`           | Setup, quickstart, common developer entry points                           | Install/dev workflow changes                 |
+| `REQ.md`              | Product requirements, user stories, acceptance criteria                    | Requirement or scope changes                 |
+| `DESIGN.md`           | Technical design, architecture, trade-offs, diagrams                       | Design or architecture changes               |
+| `CONTEXT.md`          | Current project context, stack, repo map, commands, constraints            | Any implementation-context change            |
+| `STATE.md`            | Current implementation state, completed work, next actions                 | Progress changes after meaningful work       |
+| `TDD.md`              | Test strategy, test cases, acceptance checks, quality gate                 | Test strategy or coverage changes            |
+| `RUNBOOK.md`          | Operations, deployment, rollback, incidents, recovery                      | Operational procedure changes                |
+| `AGENTS.md`           | Agent-specific working rules, codebase conventions, automation constraints | Agent workflow or convention changes         |
+| `ADR/` or `docs/adr/` | Durable architecture decisions                                             | Significant irreversible or costly decisions |
 
 ### Conflict resolution
 
@@ -97,49 +96,48 @@ If files conflict, resolve in this order unless the project defines a stricter r
 
 Keep paths exact. Add only directories/files that matter for implementation, operations, or review.
 
-| Path | Purpose | Notes / owner |
-|---|---|---|
-| `/` | Project root |  |
-| `/app` | Application frontend or primary app code |  |
-| `/api` | API/server code |  |
-| `/src` | Shared source code, if applicable |  |
-| `/tests` | Automated tests |  |
-| `/docs` | Project documentation |  |
-| `/scripts` | Local or operational scripts |  |
-| `/config` | Configuration files |  |
-| `/infra` | Infrastructure/deployment definitions |  |
-| `<path>` | `<purpose>` | `<notes>` |
+| Path               | Purpose                                                                   | Notes / owner                                                                   |
+| ------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `/`                | Project root                                                              |                                                                                 |
+| `/apps/api`        | Planned Hono API, webhook ingress, dashboard, health endpoints            | Package manifest only in Phase 0                                                |
+| `/apps/worker`     | Planned BullMQ worker and retry processing                                | Package manifest only in Phase 0                                                |
+| `/packages/core`   | Planned provider contracts, schemas, signatures, idempotency/status model | Package manifest only in Phase 0                                                |
+| `/packages/db`     | Planned Drizzle schema, migrations, repository layer                      | Package manifest only in Phase 0                                                |
+| `/packages/queue`  | Planned queue names, job contracts, enqueue helpers, retry policy         | Package manifest only in Phase 0                                                |
+| `/tools/simulator` | Planned local demo/simulator commands                                     | Package manifest only in Phase 0                                                |
+| `/infra`           | Local infrastructure definitions                                          | Docker Compose for PostgreSQL and Redis                                         |
+| `/docs`            | Project documentation                                                     | Holder for later architecture notes, demo script, and manual verification notes |
 
 ### Important generated or ignored paths
 
-| Path | Reason |
-|---|---|
-| `<path>` | Generated; do not edit directly |
+| Path     | Reason                                  |
+| -------- | --------------------------------------- |
+| `<path>` | Generated; do not edit directly         |
 | `<path>` | Build output; safe to delete/regenerate |
 
 ---
 
 ## 5. Tech stack and dependencies
 
-| Area | Current choice | Notes |
-|---|---|---|
-| Frontend | TBD |  |
-| Backend | TBD |  |
-| Runtime | TBD | Example: Node.js, Python, Bun, Deno, JVM, Go |
-| Package manager | TBD | Example: npm, pnpm, yarn, uv, pip, poetry |
-| Frameworks | TBD |  |
-| Database/storage | TBD |  |
-| Queue/background jobs | TBD |  |
-| Cache | TBD |  |
-| Search/indexing | TBD |  |
-| Auth provider | TBD |  |
-| External services | TBD |  |
-| Third-party SDKs | TBD |  |
-| Testing | TBD |  |
-| Tooling | TBD | Formatters, linters, typecheckers, codegen |
-| Docker | not configured \| configured |  |
-| Hosting/deployment target | TBD |  |
-| CI/CD | not configured \| configured | Do not assume configured unless explicitly added |
+| Area                      | Current choice                           | Notes                                               |
+| ------------------------- | ---------------------------------------- | --------------------------------------------------- |
+| Frontend                  | Server-rendered dashboard planned        | No UI implementation in Phase 0                     |
+| Backend                   | Hono planned                             | No API implementation in Phase 0                    |
+| Runtime                   | Node.js + TypeScript                     | Local Node observed as `v24.16.0`                   |
+| Package manager           | pnpm                                     | Local pnpm observed as `11.7.0`                     |
+| Frameworks                | Hono planned later                       | Not installed in Phase 0                            |
+| Database/storage          | PostgreSQL planned                       | Local Docker Compose service only in Phase 0        |
+| Queue/background jobs     | BullMQ planned                           | Not installed in Phase 0                            |
+| Cache                     | Redis planned                            | Local Docker Compose service only in Phase 0        |
+| Search/indexing           | TBD                                      |                                                     |
+| Auth provider             | TBD                                      |                                                     |
+| External services         | TBD                                      |                                                     |
+| Third-party SDKs          | TBD                                      |                                                     |
+| Testing                   | Vitest                                   | Configured to pass with no tests in Phase 0         |
+| Tooling                   | TypeScript, ESLint flat config, Prettier | Root scripts in `package.json`                      |
+| Docker                    | configured                               | `infra/docker-compose.yml` for PostgreSQL and Redis |
+| Hosting/deployment target | TBD                                      |                                                     |
+| CI/CD                     | not configured                           | Keep validation local-first in Phase 0              |
 
 ### Dependency rules
 
@@ -155,29 +153,31 @@ Keep paths exact. Add only directories/files that matter for implementation, ope
 
 All commands should be runnable from the repository root unless stated otherwise.
 
-| Purpose | Command | Notes |
-|---|---|---|
-| Install dependencies | `TBD` |  |
-| Run dev server | `TBD` |  |
-| Run tests | `TBD` |  |
-| Run unit tests | `TBD` |  |
-| Run integration tests | `TBD` |  |
-| Lint | `TBD` |  |
-| Format | `TBD` |  |
-| Typecheck | `TBD` |  |
-| Build | `TBD` |  |
-| Database migration | `TBD` |  |
-| Seed fixtures/test data | `TBD` |  |
-| Smoke test | `TBD` |  |
-| Full quality gate | `TBD` | Must pass before merge/release |
+| Purpose                 | Command                                                                                                                                                  | Notes                                               |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Install dependencies    | `pnpm install`                                                                                                                                           | Generates `pnpm-lock.yaml`                          |
+| Run dev server          | `TBD`                                                                                                                                                    | No runnable app in Phase 0                          |
+| Run tests               | `pnpm test`                                                                                                                                              | Vitest, no tests expected in Phase 0                |
+| Run unit tests          | `pnpm test`                                                                                                                                              | Same as test until suites split                     |
+| Run integration tests   | `TBD`                                                                                                                                                    | No integration tests in Phase 0                     |
+| Lint                    | `pnpm lint`                                                                                                                                              | ESLint flat config                                  |
+| Format                  | `pnpm format:check`                                                                                                                                      | Use `pnpm format` to write changes                  |
+| Typecheck               | `pnpm typecheck`                                                                                                                                         | TypeScript build mode                               |
+| Build                   | `TBD`                                                                                                                                                    |                                                     |
+| Database migration      | `TBD`                                                                                                                                                    |                                                     |
+| Seed fixtures/test data | `TBD`                                                                                                                                                    |                                                     |
+| Smoke test              | `docker compose -f .\infra\docker-compose.yml up -d; docker compose -f .\infra\docker-compose.yml ps; docker compose -f .\infra\docker-compose.yml down` | Local infra only                                    |
+| Full quality gate       | `pnpm format:check; pnpm lint; pnpm typecheck; pnpm test`                                                                                                | Add Docker Compose validation when infra is touched |
 
 ### Quality gate definition
 
 A change is considered safe to merge only when the following pass:
 
-1. `TBD`
-2. `TBD`
-3. `TBD`
+1. `pnpm format:check`
+2. `pnpm lint`
+3. `pnpm typecheck`
+4. `pnpm test`
+5. Docker Compose validation when PostgreSQL/Redis infrastructure is changed.
 
 If no automated quality gate exists yet, state that explicitly and define the current manual check.
 
@@ -187,9 +187,9 @@ If no automated quality gate exists yet, state that explicitly and define the cu
 
 ### Entities
 
-| Entity | Responsibility | Persistence | Notes |
-|---|---|---|---|
-| `<Entity>` |  |  |  |
+| Entity     | Responsibility | Persistence | Notes |
+| ---------- | -------------- | ----------- | ----- |
+| `<Entity>` |                |             |       |
 
 ### Relationships
 
@@ -217,16 +217,16 @@ If no automated quality gate exists yet, state that explicitly and define the cu
 ### Public API contracts
 
 | Method | Path / operation | Purpose | Request schema | Response schema | Errors |
-|---|---|---|---|---|---|
-| `TBD` | `TBD` |  |  |  |  |
+| ------ | ---------------- | ------- | -------------- | --------------- | ------ |
+| `TBD`  | `TBD`            |         |                |                 |        |
 
 ### Internal contracts
 
-| Type | Name | Producer | Consumer | Contract location | Notes |
-|---|---|---|---|---|---|
-| Event | `TBD` |  |  |  |  |
-| Job | `TBD` |  |  |  |  |
-| Function/module boundary | `TBD` |  |  |  |  |
+| Type                     | Name  | Producer | Consumer | Contract location | Notes |
+| ------------------------ | ----- | -------- | -------- | ----------------- | ----- |
+| Event                    | `TBD` |          |          |                   |       |
+| Job                      | `TBD` |          |          |                   |       |
+| Function/module boundary | `TBD` |          |          |                   |       |
 
 ### Integration boundaries
 
@@ -269,9 +269,9 @@ If no automated quality gate exists yet, state that explicitly and define the cu
 
 ### Data classification
 
-| Data type | Classification | Storage location | Retention | Notes |
-|---|---|---|---|---|
-| `<data>` | public \| internal \| confidential \| restricted |  |  |  |
+| Data type | Classification                                   | Storage location | Retention | Notes |
+| --------- | ------------------------------------------------ | ---------------- | --------- | ----- |
+| `<data>`  | public \| internal \| confidential \| restricted |                  |           |       |
 
 ---
 
@@ -327,26 +327,26 @@ If no automated quality gate exists yet, state that explicitly and define the cu
 
 For detailed production operations, use `RUNBOOK.md`. This section is the compact operational summary.
 
-| Operation | Command / procedure | Notes |
-|---|---|---|
-| Start locally | `TBD` |  |
-| Stop locally | `TBD` |  |
-| Safe reset | `TBD` | Include data-loss warnings |
-| Build | `TBD` |  |
-| Test | `TBD` |  |
-| Deploy | `TBD` |  |
-| Rollback | `TBD` |  |
-| View logs | `TBD` |  |
-| Health check | `TBD` |  |
-| Smoke test | `TBD` |  |
+| Operation     | Command / procedure                                            | Notes                                                           |
+| ------------- | -------------------------------------------------------------- | --------------------------------------------------------------- |
+| Start locally | `pnpm docker:up`                                               | Starts local PostgreSQL and Redis only                          |
+| Stop locally  | `pnpm docker:down`                                             | Stops local PostgreSQL and Redis without deleting named volumes |
+| Safe reset    | `TBD`                                                          | Include data-loss warnings                                      |
+| Build         | `TBD`                                                          |                                                                 |
+| Test          | `pnpm test`                                                    |                                                                 |
+| Deploy        | `TBD`                                                          |                                                                 |
+| Rollback      | `TBD`                                                          |                                                                 |
+| View logs     | `docker compose -f .\infra\docker-compose.yml logs --tail=100` |                                                                 |
+| Health check  | `pnpm docker:ps`                                               | Local infra service status                                      |
+| Smoke test    | `pnpm docker:up; pnpm docker:ps; pnpm docker:down`             |                                                                 |
 
 ### Environments
 
-| Environment | URL / identifier | Purpose | Data source | Notes |
-|---|---|---|---|---|
-| Local |  | Development |  |  |
-| Staging |  | Pre-production validation |  |  |
-| Production |  | User-facing runtime |  |  |
+| Environment | URL / identifier | Purpose                   | Data source | Notes |
+| ----------- | ---------------- | ------------------------- | ----------- | ----- |
+| Local       |                  | Development               |             |       |
+| Staging     |                  | Pre-production validation |             |       |
+| Production  |                  | User-facing runtime       |             |       |
 
 ### Operational safety
 
@@ -360,14 +360,14 @@ For detailed production operations, use `RUNBOOK.md`. This section is the compac
 
 ## 13. Performance, reliability, and cost constraints
 
-| Area | Target / constraint | Measurement | Notes |
-|---|---|---|---|
-| Latency SLO | TBD |  |  |
-| Throughput target | TBD |  |  |
-| Availability target | TBD |  |  |
-| Error budget | TBD |  |  |
-| Resource limits | TBD |  |  |
-| Cost constraint | TBD |  |  |
+| Area                | Target / constraint | Measurement | Notes |
+| ------------------- | ------------------- | ----------- | ----- |
+| Latency SLO         | TBD                 |             |       |
+| Throughput target   | TBD                 |             |       |
+| Availability target | TBD                 |             |       |
+| Error budget        | TBD                 |             |       |
+| Resource limits     | TBD                 |             |       |
+| Cost constraint     | TBD                 |             |       |
 
 - **Known bottlenecks:**
 - **Scalability assumptions:**
@@ -380,34 +380,36 @@ For detailed production operations, use `RUNBOOK.md`. This section is the compac
 
 Record durable decisions here or link to full ADR files. Prefer separate ADR files for large decisions.
 
-| ID | Date | Decision | Context | Rationale | Consequences | Status |
-|---|---|---|---|---|---|---|
-| ADR-001 | YYYY-MM-DD |  |  |  |  | proposed \| accepted \| superseded |
+| ID      | Date       | Decision | Context | Rationale | Consequences | Status                             |
+| ------- | ---------- | -------- | ------- | --------- | ------------ | ---------------------------------- |
+| ADR-001 | YYYY-MM-DD |          |         |           |              | proposed \| accepted \| superseded |
 
 ---
 
 ## 15. Current constraints
 
-| Constraint | Type | Impact | Notes |
-|---|---|---|---|
-| `TBD` | budget \| security \| deployment \| time \| technical \| product |  |  |
+| Constraint                               | Type       | Impact                                             | Notes                                                  |
+| ---------------------------------------- | ---------- | -------------------------------------------------- | ------------------------------------------------------ |
+| Real provider APIs disabled by default   | security   | Prevents accidental paid or credentialed API usage | Use mocks/local-only values unless explicitly approved |
+| GitHub Actions not configured in Phase 0 | deployment | Validation is local-first                          | Add CI only in a later requested phase                 |
+| No application behavior in Phase 0       | technical  | Scaffold only                                      | Implement handlers/workers/dashboard in later phases   |
 
 ---
 
 ## 16. Current risks
 
-| ID | Risk | Probability | Impact | Mitigation | Owner | Status |
-|---|---|---|---|---|---|---|
-| RISK-001 |  | low \| med \| high | low \| med \| high |  |  | open \| monitoring \| mitigated |
+| ID       | Risk | Probability        | Impact             | Mitigation | Owner | Status                          |
+| -------- | ---- | ------------------ | ------------------ | ---------- | ----- | ------------------------------- |
+| RISK-001 |      | low \| med \| high | low \| med \| high |            |       | open \| monitoring \| mitigated |
 
 ---
 
 ## 17. Known limitations
 
-| ID | Limitation | User impact | Workaround | Target resolution |
-|---|---|---|---|---|
-| LIMIT-001 |  |  |  |  |
-| LIMIT-002 |  |  |  |  |
+| ID        | Limitation | User impact | Workaround | Target resolution |
+| --------- | ---------- | ----------- | ---------- | ----------------- |
+| LIMIT-001 |            |             |            |                   |
+| LIMIT-002 |            |             |            |                   |
 
 ---
 
@@ -415,9 +417,9 @@ Record durable decisions here or link to full ADR files. Prefer separate ADR fil
 
 Track unknowns that block accurate implementation or operation. Resolve or move them into the relevant section when answered.
 
-| ID | Question | Owner | Needed by | Status |
-|---|---|---|---|---|
-| Q-001 |  |  | YYYY-MM-DD | open |
+| ID    | Question | Owner | Needed by  | Status |
+| ----- | -------- | ----- | ---------- | ------ |
+| Q-001 |          |       | YYYY-MM-DD | open   |
 
 ---
 

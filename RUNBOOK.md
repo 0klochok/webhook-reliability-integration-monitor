@@ -2,33 +2,33 @@
 
 ## Meta
 
-- Last updated: YYYY-MM-DD
-- Owner: <owner>
-- Status: draft | active
-- Project: <project-slug>
+- Last updated: 2026-06-20
+- Owner: Local project owner
+- Status: active
+- Project: webhook-reliability-integration-monitor
 - Repository: <repo-url-or-local-path>
 - Primary environment: Windows / PowerShell
 
 ## 1. Project overview
 
-- Purpose: <what this project does and why it exists>
-- Primary users: <who uses or maintains it>
+- Purpose: Local-first portfolio project for reliable webhook handling and integration health monitoring.
+- Primary users: Developers and operators evaluating webhook reliability patterns.
 - Stack:
-  - Runtime: <Node.js / Python / other>
-  - Backend: <framework/package, if applicable>
-  - Frontend: <framework/package, if applicable>
-  - Database: <database, if applicable>
-  - Infrastructure/services: <Docker / external APIs / queues / other>
+  - Runtime: Node.js + TypeScript
+  - Backend: Hono planned later; not implemented in Phase 0
+  - Frontend: server-rendered dashboard planned later; not implemented in Phase 0
+  - Database: PostgreSQL planned; local Docker service configured in Phase 0
+  - Infrastructure/services: Docker Compose with PostgreSQL and Redis
 - Repository path:
 
 ```powershell
-Set-Location -LiteralPath "C:\Users\Санька\Documents\Coding Projects\<project-slug>"
+Set-Location -LiteralPath "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
 ```
 
 - Main entry points:
-  - Backend: `<path-or-module>`
-  - Frontend: `<path-or-package>`
-  - Scripts: `.\scripts\<important-script>.ps1`
+  - Backend: `apps/api` planned; package manifest only in Phase 0
+  - Worker: `apps/worker` planned; package manifest only in Phase 0
+  - Simulator: `tools/simulator` planned; package manifest only in Phase 0
 
 > Keep this file operational. Replace placeholders with project-specific commands and delete sections that do not apply.
 
@@ -48,18 +48,16 @@ Set-Location -LiteralPath "C:\Users\Санька\Documents\Coding Projects\<proj
 
 Document the required tool versions for this project.
 
-| Tool | Required version | Check command | Notes |
-|---|---:|---|---|
-| Node.js | `<version>` | `node --version` | Delete if not applicable. |
-| pnpm | `<version>` | `pnpm --version` | Use through Corepack if applicable. |
-| Python | `<version>` | `python --version` | Delete if not applicable. |
-| uv | `<version>` | `uv --version` | Delete if not applicable. |
-| Docker | `<version>` | `docker --version` | Delete if not applicable. |
+| Tool           |       Required version | Check command            | Notes                                |
+| -------------- | ---------------------: | ------------------------ | ------------------------------------ |
+| Node.js        |            `>=24.16.0` | `node --version`         | Observed locally as `v24.16.0`.      |
+| pnpm           |             `>=11.7.0` | `pnpm --version`         | `packageManager` pins `pnpm@11.7.0`. |
+| Docker Compose | `v5.1.4` or compatible | `docker compose version` | Observed locally as `v5.1.4`.        |
 
 ### 3.2 Enter the project folder
 
 ```powershell
-Set-Location -LiteralPath "C:\Users\Санька\Documents\Coding Projects\<project-slug>"
+Set-Location -LiteralPath "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
 git status --short
 ```
 
@@ -68,16 +66,7 @@ git status --short
 Use only the commands that apply to this project.
 
 ```powershell
-# TypeScript / Node.js projects
-corepack enable
 pnpm install
-
-# Python projects
-uv sync
-
-# Docker-backed services, if used
-docker compose pull
-docker compose up -d
 ```
 
 ## 4. Environment variables
@@ -87,9 +76,15 @@ docker compose up -d
 3. Never commit `.env` or real secrets.
 4. Keep `.env.example` current with placeholder values only.
 
-| Variable | Required | Description | Example placeholder |
-|---|---|---|---|
-| `<VARIABLE_NAME>` | yes/no | `<what it controls>` | `<placeholder-value>` |
+| Variable                     | Required | Description                                          | Example placeholder                                                                    |
+| ---------------------------- | -------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `DATABASE_URL`               | yes      | Local PostgreSQL connection string for future phases | `postgresql://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor` |
+| `POSTGRES_USER`              | yes      | Local PostgreSQL username                            | `webhook_monitor`                                                                      |
+| `POSTGRES_PASSWORD`          | yes      | Local PostgreSQL password                            | `webhook_monitor_password`                                                             |
+| `POSTGRES_DB`                | yes      | Local PostgreSQL database                            | `webhook_monitor`                                                                      |
+| `REDIS_URL`                  | yes      | Local Redis connection string for future phases      | `redis://localhost:6379`                                                               |
+| `REAL_PROVIDER_APIS_ENABLED` | yes      | Guardrail for real provider API usage                | `false`                                                                                |
+| `WEBHOOK_SIGNING_SECRET`     | yes      | Fake local sample signing secret for future tests    | `whsec_local_fake_secret_do_not_use`                                                   |
 
 ## 5. Daily workflow
 
@@ -104,7 +99,7 @@ docker compose up -d
 9. Commit manually only after validation passes.
 
 ```powershell
-Set-Location -LiteralPath "C:\Users\Санька\Documents\Coding Projects\<project-slug>"
+Set-Location -LiteralPath "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
 git status --short
 # Optional, only when safe for the current branch/task:
 # git pull --ff-only
@@ -114,24 +109,15 @@ git status --short
 
 Replace the placeholders with the actual commands for this project. Delete unused rows.
 
-| Service | Purpose | Start command | URL / health check |
-|---|---|---|---|
-| Frontend | `<purpose>` | `pnpm dev` | `http://localhost:<port>` |
-| Backend | `<purpose>` | `uv run uvicorn <package>.main:app --reload` | `http://localhost:<port>/health` |
-| Docker services | `<purpose>` | `docker compose up -d` | `docker compose ps` |
+| Service         | Purpose                    | Start command    | URL / health check |
+| --------------- | -------------------------- | ---------------- | ------------------ |
+| Docker services | Local PostgreSQL and Redis | `pnpm docker:up` | `pnpm docker:ps`   |
 
 Common command block:
 
 ```powershell
-# Frontend
-pnpm dev
-
-# Backend
-uv run uvicorn <package>.main:app --reload
-
-# Docker services
-docker compose up -d
-docker compose ps
+pnpm docker:up
+pnpm docker:ps
 ```
 
 ## 7. Run tests
@@ -139,14 +125,7 @@ docker compose ps
 Use only the commands that apply.
 
 ```powershell
-# TypeScript / Node.js
 pnpm test
-
-# Python
-uv run pytest
-
-# End-to-end tests, if applicable
-pnpm test:e2e
 ```
 
 ## 8. Run quality gate
@@ -154,7 +133,10 @@ pnpm test:e2e
 The quality gate should be the default pre-commit validation command.
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\quality-gate.ps1
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
 ```
 
 Expected checks:
@@ -170,44 +152,45 @@ Expected checks:
 Run smoke tests after starting required services and before committing changes that affect runtime behavior.
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke.ps1
+docker compose -f .\infra\docker-compose.yml up -d
+docker compose -f .\infra\docker-compose.yml ps
+docker compose -f .\infra\docker-compose.yml down
 ```
 
 Smoke-test target:
 
-| Area | Command or URL | Expected result |
-|---|---|---|
-| Frontend | `http://localhost:<port>` | `<expected page/status>` |
-| Backend health | `http://localhost:<port>/health` | `<expected response>` |
-| CLI/job | `<command>` | `<expected output>` |
+| Area       | Command or URL                                    | Expected result                        |
+| ---------- | ------------------------------------------------- | -------------------------------------- |
+| PostgreSQL | `docker compose -f .\infra\docker-compose.yml ps` | `postgres` service is running/healthy. |
+| Redis      | `docker compose -f .\infra\docker-compose.yml ps` | `redis` service is running/healthy.    |
 
 ## 10. Logs
 
-| Source | How to inspect | Notes |
-|---|---|---|
-| Development server | Terminal running the service | `<what to look for>` |
-| Tests | Test command output | `<where reports are written>` |
-| Docker services | `docker compose logs --tail=100` | Add service name when useful. |
+| Source             | How to inspect                   | Notes                         |
+| ------------------ | -------------------------------- | ----------------------------- |
+| Development server | Terminal running the service     | `<what to look for>`          |
+| Tests              | Test command output              | `<where reports are written>` |
+| Docker services    | `docker compose logs --tail=100` | Add service name when useful. |
 
 ```powershell
 # All Docker logs
-docker compose logs --tail=100
+docker compose -f .\infra\docker-compose.yml logs --tail=100
 
 # Follow all Docker logs
-docker compose logs --tail=100 -f
+docker compose -f .\infra\docker-compose.yml logs --tail=100 -f
 
 # One service
-docker compose logs --tail=100 <service-name>
+docker compose -f .\infra\docker-compose.yml logs --tail=100 <service-name>
 ```
 
 ## 11. Debugging common issues
 
-| Symptom | Likely cause | Fix | Validation |
-|---|---|---|---|
-| `<symptom>` | `<cause>` | `<fix>` | `<command/check>` |
-| Port already in use | Previous dev server still running | Stop the old process or change the port | Service starts successfully |
-| Missing environment variable | `.env` incomplete or not loaded | Compare `.env` with `.env.example` | App starts without config error |
-| Dependency command fails | Wrong package manager or stale install | Verify tool versions, reinstall dependencies if approved | Tests/quality gate pass |
+| Symptom                      | Likely cause                           | Fix                                                      | Validation                      |
+| ---------------------------- | -------------------------------------- | -------------------------------------------------------- | ------------------------------- |
+| `<symptom>`                  | `<cause>`                              | `<fix>`                                                  | `<command/check>`               |
+| Port already in use          | Previous dev server still running      | Stop the old process or change the port                  | Service starts successfully     |
+| Missing environment variable | `.env` incomplete or not loaded        | Compare `.env` with `.env.example`                       | App starts without config error |
+| Dependency command fails     | Wrong package manager or stale install | Verify tool versions, reinstall dependencies if approved | Tests/quality gate pass         |
 
 ## 12. Safe stop and reset
 
@@ -216,7 +199,7 @@ docker compose logs --tail=100 <service-name>
 # Press Ctrl+C in the terminal running it.
 
 # Stop Docker services, if used
-docker compose down
+docker compose -f .\infra\docker-compose.yml down
 ```
 
 Do not run the following unless explicitly documented and approved for the current task:
@@ -248,7 +231,6 @@ If a reset is required, document:
 Run before manual commit.
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\forbidden-search.ps1
 git diff --check
 git status --short
 ```
@@ -292,18 +274,22 @@ Review rules:
 
 ```powershell
 git status --short
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\quality-gate.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\forbidden-search.ps1
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+docker compose -f .\infra\docker-compose.yml up -d
+docker compose -f .\infra\docker-compose.yml ps
+docker compose -f .\infra\docker-compose.yml down
 git diff -- .
 ```
 
 ## 17. Known limitations
 
-| ID | Limitation | Impact | Workaround / decision |
-|---|---|---|---|
-| LIMIT-001 | `<limitation>` | `<impact>` | `<workaround>` |
-| LIMIT-002 | `<limitation>` | `<impact>` | `<workaround>` |
+| ID        | Limitation     | Impact     | Workaround / decision |
+| --------- | -------------- | ---------- | --------------------- |
+| LIMIT-001 | `<limitation>` | `<impact>` | `<workaround>`        |
+| LIMIT-002 | `<limitation>` | `<impact>` | `<workaround>`        |
 
 ## 18. Related documentation
 

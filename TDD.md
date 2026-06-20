@@ -43,26 +43,26 @@ Use this document for:
 
 ## 4. Test environments
 
-| Environment | Purpose | Data policy | Command / URL | Notes |
-|---|---|---|---|---|
-| Local | Fast development feedback | Synthetic or sanitized only | `<command>` | Must run targeted tests before commit. |
-| CI | Mandatory quality gate | Synthetic or sanitized only | `<command>` | Must be deterministic and non-interactive. |
-| Preview / staging | Integrated validation and smoke checks | Non-production or sanitized only | `<command/url>` | Use seeded data where possible. |
-| Production smoke | Post-release verification only | Read-only or explicitly safe data | `<command/runbook>` | Must not mutate customer data unless approved. |
+| Environment       | Purpose                                | Data policy                       | Command / URL       | Notes                                          |
+| ----------------- | -------------------------------------- | --------------------------------- | ------------------- | ---------------------------------------------- |
+| Local             | Fast development feedback              | Synthetic or sanitized only       | `<command>`         | Must run targeted tests before commit.         |
+| CI                | Mandatory quality gate                 | Synthetic or sanitized only       | `<command>`         | Must be deterministic and non-interactive.     |
+| Preview / staging | Integrated validation and smoke checks | Non-production or sanitized only  | `<command/url>`     | Use seeded data where possible.                |
+| Production smoke  | Post-release verification only         | Read-only or explicitly safe data | `<command/runbook>` | Must not mutate customer data unless approved. |
 
 ## 5. Test layers
 
-| Layer | Required when | Examples | Tool / location | Command | Required for done? |
-|---|---|---|---|---|---|
-| Unit | Core logic, validation, transformations, state machines, utilities, business rules | Pure functions, domain services, validators | `<tool/path>` | `<command>` | yes/no |
-| Integration | Persistence, adapters, API handlers, queues, file systems, service boundaries | Repository tests, API + DB tests, adapter tests | `<tool/path>` | `<command>` | yes/no |
-| Contract | Public APIs, schemas, events, third-party integrations, provider/consumer boundaries | OpenAPI/schema tests, event payload compatibility | `<tool/path>` | `<command>` | yes/no |
-| E2E | Critical UI or system flows where unit/integration tests cannot prove behavior | Sign-up, checkout, import/export, core workflows | `<tool/path>` | `<command>` | yes/no |
-| Smoke | Runnable app, service, worker, CLI, or release candidate exists | App boots, health endpoint, CLI help, basic workflow | `<tool/path>` | `<command>` | yes/no |
-| Security / safety | Secrets, auth, permissions, risky actions, external integrations, destructive operations | Access control, unsafe input, secret leakage, guardrails | `<tool/path>` | `<command>` | yes/no |
-| Visual regression | UI layout or design-critical screens exist | Screenshots, component snapshots, responsive states | `<tool/path>` | `<command>` | yes/no |
-| Performance smoke | Latency, throughput, memory, startup time, or scale-sensitive code exists | Baseline request time, job duration, render time | `<tool/path>` | `<command>` | yes/no |
-| Accessibility smoke | User-facing UI exists | Keyboard flow, labels, contrast, semantic structure | `<tool/path>` | `<command>` | yes/no |
+| Layer               | Required when                                                                            | Examples                                                 | Tool / location | Command     | Required for done? |
+| ------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------- | ----------- | ------------------ |
+| Unit                | Core logic, validation, transformations, state machines, utilities, business rules       | Pure functions, domain services, validators              | `<tool/path>`   | `<command>` | yes/no             |
+| Integration         | Persistence, adapters, API handlers, queues, file systems, service boundaries            | Repository tests, API + DB tests, adapter tests          | `<tool/path>`   | `<command>` | yes/no             |
+| Contract            | Public APIs, schemas, events, third-party integrations, provider/consumer boundaries     | OpenAPI/schema tests, event payload compatibility        | `<tool/path>`   | `<command>` | yes/no             |
+| E2E                 | Critical UI or system flows where unit/integration tests cannot prove behavior           | Sign-up, checkout, import/export, core workflows         | `<tool/path>`   | `<command>` | yes/no             |
+| Smoke               | Runnable app, service, worker, CLI, or release candidate exists                          | App boots, health endpoint, CLI help, basic workflow     | `<tool/path>`   | `<command>` | yes/no             |
+| Security / safety   | Secrets, auth, permissions, risky actions, external integrations, destructive operations | Access control, unsafe input, secret leakage, guardrails | `<tool/path>`   | `<command>` | yes/no             |
+| Visual regression   | UI layout or design-critical screens exist                                               | Screenshots, component snapshots, responsive states      | `<tool/path>`   | `<command>` | yes/no             |
+| Performance smoke   | Latency, throughput, memory, startup time, or scale-sensitive code exists                | Baseline request time, job duration, render time         | `<tool/path>`   | `<command>` | yes/no             |
+| Accessibility smoke | User-facing UI exists                                                                    | Keyboard flow, labels, contrast, semantic structure      | `<tool/path>`   | `<command>` | yes/no             |
 
 ## 6. Red-green-refactor workflow
 
@@ -91,18 +91,18 @@ Use this section for each non-trivial feature, bug fix, or behavior-changing ref
 
 ### Behavior to verify
 
-| Case | Required? | Layer | Test name / location | Notes |
-|---|---|---|---|---|
-| Happy path | yes/no |  |  |  |
-| Validation / invalid input | yes/no |  |  |  |
-| Error handling / retry behavior | yes/no |  |  |  |
-| Authentication / authorization | yes/no |  |  |  |
-| State transition / persistence | yes/no |  |  |  |
-| External integration / contract | yes/no |  |  |  |
-| Edge conditions / boundaries | yes/no |  |  |  |
-| Backward compatibility | yes/no |  |  |  |
-| Regression coverage | yes/no |  |  |  |
-| Observability: logs, metrics, traces, audit events | yes/no |  |  |  |
+| Case                                               | Required? | Layer | Test name / location | Notes |
+| -------------------------------------------------- | --------- | ----- | -------------------- | ----- |
+| Happy path                                         | yes/no    |       |                      |       |
+| Validation / invalid input                         | yes/no    |       |                      |       |
+| Error handling / retry behavior                    | yes/no    |       |                      |       |
+| Authentication / authorization                     | yes/no    |       |                      |       |
+| State transition / persistence                     | yes/no    |       |                      |       |
+| External integration / contract                    | yes/no    |       |                      |       |
+| Edge conditions / boundaries                       | yes/no    |       |                      |       |
+| Backward compatibility                             | yes/no    |       |                      |       |
+| Regression coverage                                | yes/no    |       |                      |       |
+| Observability: logs, metrics, traces, audit events | yes/no    |       |                      |       |
 
 ### Test data
 
@@ -126,36 +126,36 @@ Use this section for each non-trivial feature, bug fix, or behavior-changing ref
 
 ### Required gates
 
-| Gate | Command | Required when | Pass criteria | Required for phase done? |
-|---|---|---|---|---|
-| Format | `<command>` | Code or docs are changed | No formatting diff remains | yes/no |
-| Lint | `<command>` | Code is changed | No lint errors | yes/no |
-| Typecheck | `<command>` | Typed code is changed | No type errors | yes/no |
-| Unit tests | `<command>` | Any logic is changed | All relevant tests pass | yes/no |
-| Integration tests | `<command>` | Adapters, API, persistence, queues, files, or services are changed | All relevant tests pass | yes/no |
-| Contract tests | `<command>` | Schemas, public APIs, events, or provider/consumer boundaries change | Contracts are compatible or versioned | yes/no |
-| Build | `<command>` | Buildable artifact exists | Build succeeds | yes/no |
-| Smoke | `<command>` | Runnable app/service/worker/CLI exists | Basic runtime path succeeds | yes/no |
-| Forbidden / secret scan | `<command>` | Any code, config, or docs change | No committed secrets or forbidden patterns | yes/no |
-| Docs / state check | `<command/manual>` | Behavior, workflow, command, policy, or status changes | Relevant docs and `STATE.md` are current | yes/no |
+| Gate                    | Command            | Required when                                                        | Pass criteria                              | Required for phase done? |
+| ----------------------- | ------------------ | -------------------------------------------------------------------- | ------------------------------------------ | ------------------------ |
+| Format                  | `<command>`        | Code or docs are changed                                             | No formatting diff remains                 | yes/no                   |
+| Lint                    | `<command>`        | Code is changed                                                      | No lint errors                             | yes/no                   |
+| Typecheck               | `<command>`        | Typed code is changed                                                | No type errors                             | yes/no                   |
+| Unit tests              | `<command>`        | Any logic is changed                                                 | All relevant tests pass                    | yes/no                   |
+| Integration tests       | `<command>`        | Adapters, API, persistence, queues, files, or services are changed   | All relevant tests pass                    | yes/no                   |
+| Contract tests          | `<command>`        | Schemas, public APIs, events, or provider/consumer boundaries change | Contracts are compatible or versioned      | yes/no                   |
+| Build                   | `<command>`        | Buildable artifact exists                                            | Build succeeds                             | yes/no                   |
+| Smoke                   | `<command>`        | Runnable app/service/worker/CLI exists                               | Basic runtime path succeeds                | yes/no                   |
+| Forbidden / secret scan | `<command>`        | Any code, config, or docs change                                     | No committed secrets or forbidden patterns | yes/no                   |
+| Docs / state check      | `<command/manual>` | Behavior, workflow, command, policy, or status changes               | Relevant docs and `STATE.md` are current   | yes/no                   |
 
 ### Optional gates
 
-| Gate | Command | Required when promoted to mandatory | Notes |
-|---|---|---|---|
-| E2E | `<command>` | Critical flow cannot be sufficiently covered below E2E | Keep minimal and stable. |
-| Visual regression | `<command>` | Visual layout is user-critical | Prefer stable fixtures and deterministic rendering. |
-| Performance smoke | `<command>` | Latency, memory, throughput, or startup time is material | Track baseline and threshold. |
-| Accessibility smoke | `<command>` | User-facing UI changes | Include keyboard and semantic checks. |
-| Dependency audit | `<command>` | Dependencies change or release is prepared | Record accepted risk. |
+| Gate                | Command     | Required when promoted to mandatory                      | Notes                                               |
+| ------------------- | ----------- | -------------------------------------------------------- | --------------------------------------------------- |
+| E2E                 | `<command>` | Critical flow cannot be sufficiently covered below E2E   | Keep minimal and stable.                            |
+| Visual regression   | `<command>` | Visual layout is user-critical                           | Prefer stable fixtures and deterministic rendering. |
+| Performance smoke   | `<command>` | Latency, memory, throughput, or startup time is material | Track baseline and threshold.                       |
+| Accessibility smoke | `<command>` | User-facing UI changes                                   | Include keyboard and semantic checks.               |
+| Dependency audit    | `<command>` | Dependencies change or release is prepared               | Record accepted risk.                               |
 
 ### Skipped gate record
 
 A skipped applicable gate must be recorded here before the phase is considered done.
 
-| Date | Gate | Why skipped | Risk | Next action | Owner | Due date |
-|---|---|---|---|---|---|---|
-| YYYY-MM-DD |  |  |  |  |  |  |
+| Date       | Gate | Why skipped | Risk | Next action | Owner | Due date |
+| ---------- | ---- | ----------- | ---- | ----------- | ----- | -------- |
+| YYYY-MM-DD |      |             |      |             |       |          |
 
 ## 9. Fixtures, mocks, and test data
 
@@ -190,9 +190,9 @@ A skipped applicable gate must be recorded here before the phase is considered d
 
 ### Regression log
 
-| Bug ID | Date | Found in | Root cause | Test added? | Test location | Preventive action | Owner |
-|---|---|---|---|---|---|---|---|
-| BUG-001 | YYYY-MM-DD | `<phase/env>` | `<cause>` | yes/no | `<path>` | `<action>` | `<name>` |
+| Bug ID  | Date       | Found in      | Root cause | Test added? | Test location | Preventive action | Owner    |
+| ------- | ---------- | ------------- | ---------- | ----------- | ------------- | ----------------- | -------- |
+| BUG-001 | YYYY-MM-DD | `<phase/env>` | `<cause>`  | yes/no      | `<path>`      | `<action>`        | `<name>` |
 
 ## 12. Flakiness protocol
 
@@ -203,17 +203,17 @@ A skipped applicable gate must be recorded here before the phase is considered d
 - Max quarantine period: `<duration>`
 - While quarantined, the owner must either fix determinism, isolate the dependency, replace the test with stable coverage, or justify removal.
 
-| Test | First seen | Suspected cause | Quarantined? | Owner | Due date | Resolution |
-|---|---|---|---|---|---|---|
-| `<test name/path>` | YYYY-MM-DD |  | yes/no |  |  |  |
+| Test               | First seen | Suspected cause | Quarantined? | Owner | Due date | Resolution |
+| ------------------ | ---------- | --------------- | ------------ | ----- | -------- | ---------- |
+| `<test name/path>` | YYYY-MM-DD |                 | yes/no       |       |          |            |
 
 ## 13. Known gaps and test debt
 
 Known gaps are allowed only when explicit, owned, and time-bound.
 
-| Gap | Affected area | Risk | Reason not covered now | Next action | Owner | Due date |
-|---|---|---|---|---|---|---|
-| `<gap>` |  | low/medium/high |  |  |  |  |
+| Gap     | Affected area | Risk            | Reason not covered now | Next action | Owner | Due date |
+| ------- | ------------- | --------------- | ---------------------- | ----------- | ----- | -------- |
+| `<gap>` |               | low/medium/high |                        |             |       |          |
 
 ## 14. Definition of done
 

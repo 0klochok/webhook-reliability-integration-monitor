@@ -15,16 +15,16 @@
 
 ## Meta
 
-| Field | Value |
-|---|---|
-| Last updated | YYYY-MM-DD |
-| Owner | `<name>` |
-| Status | draft \| active \| approved \| archived |
-| Project type | portfolio/demo \| client \| internal tool \| automation \| QA \| API/backend \| AI workflow |
-| Version | v0.1 |
-| Related docs | PRD / TECH / TEST / DESIGN / API docs |
-| Repository / workspace | `<link>` |
-| Stakeholders | `<names / roles>` |
+| Field                  | Value                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------- |
+| Last updated           | YYYY-MM-DD                                                                                  |
+| Owner                  | `<name>`                                                                                    |
+| Status                 | draft \| active \| approved \| archived                                                     |
+| Project type           | portfolio/demo \| client \| internal tool \| automation \| QA \| API/backend \| AI workflow |
+| Version                | v0.1                                                                                        |
+| Related docs           | PRD / TECH / TEST / DESIGN / API docs                                                       |
+| Repository / workspace | `<link>`                                                                                    |
+| Stakeholders           | `<names / roles>`                                                                           |
 
 ---
 
@@ -44,11 +44,11 @@
 
 ## 2. Target audience / ICP
 
-| Segment | Description | Context of use | Pain points | Success need |
-|---|---|---|---|---|
-| Primary |  |  |  |  |
-| Secondary |  |  |  |  |
-| Excluded / not targeted |  |  |  |  |
+| Segment                 | Description | Context of use | Pain points | Success need |
+| ----------------------- | ----------- | -------------- | ----------- | ------------ |
+| Primary                 |             |                |             |              |
+| Secondary               |             |                |             |              |
+| Excluded / not targeted |             |                |             |              |
 
 ---
 
@@ -56,11 +56,11 @@
 
 ### 3.1 Business goals
 
-| ID | Goal | Rationale | Metric / target | Priority |
-|---|---|---|---|---|
-| BG-001 |  |  |  | P0/P1/P2 |
-| BG-002 |  |  |  | P0/P1/P2 |
-| BG-003 |  |  |  | P0/P1/P2 |
+| ID     | Goal | Rationale | Metric / target | Priority |
+| ------ | ---- | --------- | --------------- | -------- |
+| BG-001 |      |           |                 | P0/P1/P2 |
+| BG-002 |      |           |                 | P0/P1/P2 |
+| BG-003 |      |           |                 | P0/P1/P2 |
 
 ### 3.2 Success metrics
 
@@ -98,19 +98,19 @@ The project is successful when:
 
 ### 5.1 In scope
 
-| ID | Item | Priority | Notes / boundary |
-|---|---|---|---|
-| REQ-IN-001 |  | P0/P1/P2 |  |
-| REQ-IN-002 |  | P0/P1/P2 |  |
-| REQ-IN-003 |  | P0/P1/P2 |  |
+| ID         | Item | Priority | Notes / boundary |
+| ---------- | ---- | -------- | ---------------- |
+| REQ-IN-001 |      | P0/P1/P2 |                  |
+| REQ-IN-002 |      | P0/P1/P2 |                  |
+| REQ-IN-003 |      | P0/P1/P2 |                  |
 
 ### 5.2 Out of scope
 
-| ID | Item | Reason | Revisit trigger |
-|---|---|---|---|
-| REQ-OUT-001 |  |  |  |
-| REQ-OUT-002 |  |  |  |
-| REQ-OUT-003 |  |  |  |
+| ID          | Item | Reason | Revisit trigger |
+| ----------- | ---- | ------ | --------------- |
+| REQ-OUT-001 |      |        |                 |
+| REQ-OUT-002 |      |        |                 |
+| REQ-OUT-003 |      |        |                 |
 
 ---
 
@@ -151,11 +151,11 @@ Functional requirements should describe observable product behavior, not impleme
 
 ### 7.1 Summary
 
-| ID | Requirement | User story | Priority | Dependencies | Acceptance signal | Status |
-|---|---|---|---|---|---|---|
-| FR-001 |  | As a `[role]`, I want `[capability]`, so that `[outcome]`. | P0/P1/P2 |  | test/manual signal | proposed |
-| FR-002 |  | As a `[role]`, I want `[capability]`, so that `[outcome]`. | P0/P1/P2 |  | test/manual signal | proposed |
-| FR-003 |  | As a `[role]`, I want `[capability]`, so that `[outcome]`. | P0/P1/P2 |  | test/manual signal | proposed |
+| ID     | Requirement | User story                                                 | Priority | Dependencies | Acceptance signal  | Status   |
+| ------ | ----------- | ---------------------------------------------------------- | -------- | ------------ | ------------------ | -------- |
+| FR-001 |             | As a `[role]`, I want `[capability]`, so that `[outcome]`. | P0/P1/P2 |              | test/manual signal | proposed |
+| FR-002 |             | As a `[role]`, I want `[capability]`, so that `[outcome]`. | P0/P1/P2 |              | test/manual signal | proposed |
+| FR-003 |             | As a `[role]`, I want `[capability]`, so that `[outcome]`. | P0/P1/P2 |              | test/manual signal | proposed |
 
 ### 7.2 Requirement detail
 
@@ -195,27 +195,27 @@ Functional requirements should describe observable product behavior, not impleme
 
 ## 8. Non-functional requirements
 
-| ID | Category | Requirement | Target / threshold | Validation method | Priority |
-|---|---|---|---|---|---|
-| NFR-001 | Performance |  |  | load test / benchmark / manual | P0/P1/P2 |
-| NFR-002 | Reliability |  |  | test / monitoring / review | P0/P1/P2 |
-| NFR-003 | Security |  |  | review / scan / test | P0/P1/P2 |
-| NFR-004 | Accessibility |  |  | WCAG review / manual test | P0/P1/P2 |
-| NFR-005 | Localization |  |  | locale test / content review | P0/P1/P2 |
-| NFR-006 | Maintainability |  |  | code review / lint / architecture review | P0/P1/P2 |
-| NFR-007 | Cost / budget |  |  | budget review / usage monitoring | P0/P1/P2 |
-| NFR-008 | Local development |  |  | setup test / README check | P0/P1/P2 |
-| NFR-009 | Documentation |  |  | doc review | P0/P1/P2 |
-| NFR-010 | Observability |  |  | logs / metrics / alerts review | P0/P1/P2 |
+| ID      | Category          | Requirement | Target / threshold | Validation method                        | Priority |
+| ------- | ----------------- | ----------- | ------------------ | ---------------------------------------- | -------- |
+| NFR-001 | Performance       |             |                    | load test / benchmark / manual           | P0/P1/P2 |
+| NFR-002 | Reliability       |             |                    | test / monitoring / review               | P0/P1/P2 |
+| NFR-003 | Security          |             |                    | review / scan / test                     | P0/P1/P2 |
+| NFR-004 | Accessibility     |             |                    | WCAG review / manual test                | P0/P1/P2 |
+| NFR-005 | Localization      |             |                    | locale test / content review             | P0/P1/P2 |
+| NFR-006 | Maintainability   |             |                    | code review / lint / architecture review | P0/P1/P2 |
+| NFR-007 | Cost / budget     |             |                    | budget review / usage monitoring         | P0/P1/P2 |
+| NFR-008 | Local development |             |                    | setup test / README check                | P0/P1/P2 |
+| NFR-009 | Documentation     |             |                    | doc review                               | P0/P1/P2 |
+| NFR-010 | Observability     |             |                    | logs / metrics / alerts review           | P0/P1/P2 |
 
 ---
 
 ## 9. Integration requirements
 
-| ID | External API / service | Purpose | Auth / secrets | Rate limits | Failure mode | Mock / test strategy | Live-test policy |
-|---|---|---|---|---|---|---|---|
-| INT-001 |  |  |  |  |  |  |  |
-| INT-002 |  |  |  |  |  |  |  |
+| ID      | External API / service | Purpose | Auth / secrets | Rate limits | Failure mode | Mock / test strategy | Live-test policy |
+| ------- | ---------------------- | ------- | -------------- | ----------- | ------------ | -------------------- | ---------------- |
+| INT-001 |                        |         |                |             |              |                      |                  |
+| INT-002 |                        |         |                |             |              |                      |                  |
 
 Additional notes:
 
@@ -231,10 +231,10 @@ Additional notes:
 
 ### 10.1 Entities
 
-| ID | Entity | Key fields | Source | Storage | Owner | PII / sensitive? |
-|---|---|---|---|---|---|---|
-| DATA-001 |  |  |  |  |  | yes/no |
-| DATA-002 |  |  |  |  |  | yes/no |
+| ID       | Entity | Key fields | Source | Storage | Owner | PII / sensitive? |
+| -------- | ------ | ---------- | ------ | ------- | ----- | ---------------- |
+| DATA-001 |        |            |        |         |       | yes/no           |
+| DATA-002 |        |            |        |         |       | yes/no           |
 
 ### 10.2 Data operations
 
@@ -255,11 +255,11 @@ Acceptance criteria must be behavior-focused and mapped to requirements.
 
 ### 11.1 Acceptance criteria
 
-| ID | Requirement ref | Given | When | Then | Validation | Priority |
-|---|---|---|---|---|---|---|
-| AC-001 | FR-001 |  |  |  | test/manual | P0/P1/P2 |
-| AC-002 | FR-001 |  |  |  | test/manual | P0/P1/P2 |
-| AC-003 | FR-002 |  |  |  | test/manual | P0/P1/P2 |
+| ID     | Requirement ref | Given | When | Then | Validation  | Priority |
+| ------ | --------------- | ----- | ---- | ---- | ----------- | -------- |
+| AC-001 | FR-001          |       |      |      | test/manual | P0/P1/P2 |
+| AC-002 | FR-001          |       |      |      | test/manual | P0/P1/P2 |
+| AC-003 | FR-002          |       |      |      | test/manual | P0/P1/P2 |
 
 ### 11.2 Quality gates
 
@@ -274,10 +274,10 @@ Acceptance criteria must be behavior-focused and mapped to requirements.
 ### 11.3 Manual smoke test
 
 | Step | Action | Expected result | Pass / fail | Notes |
-|---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
+| ---- | ------ | --------------- | ----------- | ----- |
+| 1    |        |                 |             |       |
+| 2    |        |                 |             |       |
+| 3    |        |                 |             |       |
 
 ---
 
@@ -306,25 +306,25 @@ Readiness checklist:
 
 ### 13.1 Risks and assumptions
 
-| ID | Type | Description | Impact | Likelihood | Mitigation | Owner | Status |
-|---|---|---|---|---|---|---|---|
-| RA-001 | assumption |  | low/med/high | low/med/high |  |  | open/closed |
-| RA-002 | risk |  | low/med/high | low/med/high |  |  | open/closed |
+| ID     | Type       | Description | Impact       | Likelihood   | Mitigation | Owner | Status      |
+| ------ | ---------- | ----------- | ------------ | ------------ | ---------- | ----- | ----------- |
+| RA-001 | assumption |             | low/med/high | low/med/high |            |       | open/closed |
+| RA-002 | risk       |             | low/med/high | low/med/high |            |       | open/closed |
 
 ### 13.2 Decisions
 
-| ID | Decision | Rationale | Date | Owner | Supersedes |
-|---|---|---|---|---|---|
-| DEC-001 |  |  | YYYY-MM-DD |  |  |
+| ID      | Decision | Rationale | Date       | Owner | Supersedes |
+| ------- | -------- | --------- | ---------- | ----- | ---------- |
+| DEC-001 |          |           | YYYY-MM-DD |       |            |
 
 ---
 
 ## 14. Open questions
 
-| ID | Question | Owner | Decision needed by | Impact if unresolved | Status |
-|---|---|---|---|---|---|
-| Q-001 |  |  | YYYY-MM-DD |  | open/closed |
-| Q-002 |  |  | YYYY-MM-DD |  | open/closed |
+| ID    | Question | Owner | Decision needed by | Impact if unresolved | Status      |
+| ----- | -------- | ----- | ------------------ | -------------------- | ----------- |
+| Q-001 |          |       | YYYY-MM-DD         |                      | open/closed |
+| Q-002 |          |       | YYYY-MM-DD         |                      | open/closed |
 
 ---
 
@@ -333,8 +333,8 @@ Readiness checklist:
 ### Glossary
 
 | Term | Definition |
-|---|---|
-|  |  |
+| ---- | ---------- |
+|      |            |
 
 ### References
 

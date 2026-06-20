@@ -1,0 +1,30 @@
+{
+  "name": "webhook-reliability-integration-monitor",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=24.16.0",
+    "pnpm": ">=11.7.0"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "docker:up": "docker compose -f .\\infra\\docker-compose.yml up -d",
+    "docker:down": "docker compose -f .\\infra\\docker-compose.yml down",
+    "docker:ps": "docker compose -f .\\infra\\docker-compose.yml ps"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.3",
+    "eslint": "^10.5.0",
+    "prettier": "^3.8.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^4.1.9"
+  }
+}

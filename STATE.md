@@ -4,16 +4,16 @@
 
 ## Meta
 
-- Last updated: YYYY-MM-DD HH:mm TZ
-- Owner: <name/team>
-- Contributors: <names/roles>
-- Repository path: <path-or-url>
-- Current branch: <branch>
-- Current phase: Phase N — <name>
-- Overall status: on-track | at-risk | blocked
-- Quality gate status: unknown | baseline captured | green | red
-- Completion: 0-100%
-- Main blocker: none | <blocker>
+- Last updated: 2026-06-20 Europe/Kyiv
+- Owner: Local project owner
+- Contributors: Codex
+- Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
+- Current branch: `main`
+- Current phase: Phase 0 — Foundation
+- Overall status: at-risk
+- Quality gate status: red
+- Completion: 90%
+- Main blocker: Docker Desktop engine is not running, so Docker Compose validation cannot complete.
 
 ## Update rules
 
@@ -25,107 +25,124 @@
 
 ## 1. Current objective
 
-- Phase objective: <what this phase is trying to achieve>
-- Deadline / target date: YYYY-MM-DD | none
-- Definition of done: <specific completion criteria>
-- Primary user-visible signal: <what the user should see when this is working>
-- Secondary checks: <supporting checks, metrics, or edge cases>
-- Out of scope: <what should not be changed now>
+- Phase objective: Establish a clean pnpm workspace foundation for the TypeScript webhook reliability monitor.
+- Deadline / target date: none
+- Definition of done: Workspace scaffold exists, dependencies are installed, local quality gates pass, Docker Compose local infra is validated, and no application behavior is implemented.
+- Primary user-visible signal: Root scripts and workspace directories exist and run local validation commands.
+- Secondary checks: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, Docker Compose up/ps/down, and `git status --short`.
+- Out of scope: Webhook handlers, signature verification, worker processing, dashboard logic, database business schema, simulator behavior, GitHub Actions, commits, pushes, tags, and real provider APIs.
 
 ## 2. Status snapshot
 
-- Summary: <one-paragraph current state>
-- Since last update: <most important change>
-- Current focus: <what is being worked on now>
-- Main uncertainty: none | <unknown / assumption to verify>
+- Summary: Phase 0 workspace foundation is implemented. Node/pnpm quality gates pass; Docker Compose validation is blocked by the local Docker Desktop daemon being unavailable.
+- Since last update: Added pnpm workspace tooling, package manifests, local PostgreSQL/Redis Compose config, README setup notes, and current command documentation.
+- Current focus: Complete Docker Compose validation after Docker Desktop is running.
+- Main uncertainty: Whether local ports `5432` and `6379` are available once Docker Desktop starts.
 
 ## 3. Completed phases / milestones
 
-| Phase | Date | Summary | Quality gate | Commit / PR |
-|---|---|---|---|---|
-| Phase 0 — <name> | YYYY-MM-DD | <summary> | pass/partial/fail/n/a | <hash-or-link> |
+| Phase                | Date       | Summary                                         | Quality gate | Commit / PR |
+| -------------------- | ---------- | ----------------------------------------------- | ------------ | ----------- |
+| Phase 0 — Foundation | 2026-06-20 | pnpm workspace scaffold and local infra config. | partial      | none        |
 
 ## 4. Completed since last update
 
-- YYYY-MM-DD: <completed item> — evidence: <commit/PR/log/path>
+- 2026-06-20: Created pnpm workspace foundation — evidence: root `package.json`, `pnpm-workspace.yaml`, TypeScript/ESLint/Prettier/Vitest configs, and workspace package manifests.
+- 2026-06-20: Added local PostgreSQL and Redis Compose config — evidence: `infra/docker-compose.yml`.
+- 2026-06-20: Installed Phase 0 dev dependencies — evidence: `pnpm-lock.yaml` and root `devDependencies`.
 
 ## 5. Changed files
 
-| Path | Purpose | Status | Notes |
-|---|---|---|---|
-| <path> | <why changed> | created/updated/deleted/renamed | <important notes> |
+| Path                                          | Purpose                              | Status  | Notes                                     |
+| --------------------------------------------- | ------------------------------------ | ------- | ----------------------------------------- |
+| `package.json`, `pnpm-workspace.yaml`         | Root pnpm workspace and scripts      | created | No runtime app dependencies added.        |
+| `tsconfig.base.json`, `tsconfig.json`         | TypeScript baseline                  | created | ESM-oriented Node TypeScript config.      |
+| `eslint.config.js`, `.prettierrc.json`        | Lint and format tooling              | created | ESLint flat config and Prettier config.   |
+| `.gitignore`, `.editorconfig`, `.env.example` | Local repository defaults            | created | `.env.example` contains fake values only. |
+| `apps/*`, `packages/*`, `tools/simulator`     | Future workspace package directories | created | Package manifests only; no source code.   |
+| `infra/docker-compose.yml`                    | Local PostgreSQL and Redis services  | created | Named volumes and health checks.          |
+| `README.md`, `CONTEXT.md`, `RUNBOOK.md`       | Setup and workflow documentation     | updated | Phase 0 commands and constraints.         |
+| `REQ.md`, `DESIGN.md`, `TDD.md`, `STATE.md`   | Existing templates                   | updated | Formatted by Prettier.                    |
 
 ## 6. Validation and quality gates
 
 ### Required gates
 
-| Gate | Command | Status | Evidence / notes |
-|---|---|---|---|
-| format | <command> | pass/fail/not run/n/a | <output, log path, or reason> |
-| lint | <command> | pass/fail/not run/n/a | <output, log path, or reason> |
-| typecheck | <command> | pass/fail/not run/n/a | <output, log path, or reason> |
-| unit tests | <command> | pass/fail/not run/n/a | <output, log path, or reason> |
-| integration tests | <command> | pass/fail/not run/n/a | <output, log path, or reason> |
-| build | <command> | pass/fail/not run/n/a | <output, log path, or reason> |
-| smoke/manual | <steps-or-command> | pass/fail/not run/n/a | <evidence or scenario> |
-| docs check | <command-or-review> | pass/fail/not run/n/a | <output, log path, or reason> |
-| forbidden scan | <command> | pass/fail/not run/n/a | <secrets, debug logs, TODO policy, generated files, etc.> |
+| Gate              | Command                                                                                     | Status  | Evidence / notes                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| install           | `pnpm add -D ...`                                                                           | fail    | pnpm refused root workspace add without `-w`.                                                                                           |
+| install           | `pnpm add -w -D typescript @types/node vitest eslint @eslint/js typescript-eslint prettier` | pass    | Added only Phase 0 dev dependencies.                                                                                                    |
+| format            | `pnpm format:check`                                                                         | pass    | Initial run failed; after `pnpm format`, rerun passed with `All matched files use Prettier code style!`.                                |
+| lint              | `pnpm lint`                                                                                 | pass    | `eslint .` completed with exit code 0.                                                                                                  |
+| typecheck         | `pnpm typecheck`                                                                            | pass    | `tsc -b --pretty false` completed with exit code 0.                                                                                     |
+| unit tests        | `pnpm test`                                                                                 | pass    | Vitest `v4.1.9` found no test files and exited with code 0 due `passWithNoTests`.                                                       |
+| integration tests | `TBD`                                                                                       | n/a     | No application or integration behavior exists in Phase 0.                                                                               |
+| build             | `TBD`                                                                                       | n/a     | No buildable app artifact exists in Phase 0.                                                                                            |
+| smoke/manual      | `docker compose -f .\infra\docker-compose.yml up -d`                                        | fail    | Docker engine unavailable: `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.`                         |
+| smoke/manual      | `docker compose -f .\infra\docker-compose.yml ps`                                           | fail    | Same Docker engine unavailable error.                                                                                                   |
+| smoke/manual      | `docker compose -f .\infra\docker-compose.yml down`                                         | fail    | Same Docker engine unavailable error; no services were started.                                                                         |
+| docs check        | manual review                                                                               | pass    | README, context, runbook, and state reflect Phase 0 setup and no real provider API policy.                                              |
+| forbidden scan    | `TBD`                                                                                       | not run | No repository script exists yet. `.env.example` uses fake local-only values; run an explicit scan in a future hardening phase if added. |
 
 ### Optional / skipped gates
 
-| Gate | Status | Reason | Follow-up |
-|---|---|---|---|
-| e2e | skipped/not run/pass/fail/n/a | <why> | <when/how to run> |
-| performance | skipped/not run/pass/fail/n/a | <why> | <when/how to run> |
-| accessibility | skipped/not run/pass/fail/n/a | <why> | <when/how to run> |
+| Gate          | Status | Reason                                      | Follow-up                           |
+| ------------- | ------ | ------------------------------------------- | ----------------------------------- |
+| e2e           | n/a    | No runnable app or browser flow in Phase 0. | Revisit when dashboard/API exists.  |
+| performance   | n/a    | No runtime behavior in Phase 0.             | Revisit after worker/API are built. |
+| accessibility | n/a    | No dashboard UI in Phase 0.                 | Revisit when dashboard UI is added. |
 
 ## 7. Active tasks
 
-| ID | Priority | Task | Owner | Status | ETA | Notes |
-|---|---|---|---|---|---|---|
-| TASK-001 | P0/P1/P2/P3 | <task> | <owner> | todo/in-progress/review/blocked | YYYY-MM-DD | <notes> |
+| ID       | Priority | Task                                                                            | Owner | Status  | ETA  | Notes                                     |
+| -------- | -------- | ------------------------------------------------------------------------------- | ----- | ------- | ---- | ----------------------------------------- |
+| TASK-001 | P0       | Rerun Docker Compose validation after starting Docker Desktop.                  | User  | blocked | none | Required before Phase 0 is fully green.   |
+| TASK-002 | P1       | Review formatted template-doc diffs before manual commit.                       | User  | todo    | none | Prettier touched existing Markdown files. |
+| TASK-003 | P1       | Start Phase 1 provider contracts and validation plan after Phase 0 is accepted. | User  | todo    | none | Keep mock/local-only external API policy. |
 
 ## 8. Backlog / long horizon
 
-| Priority | Item | Impact | Effort | Status | Notes |
-|---|---|---|---|---|---|
+| Priority    | Item   | Impact       | Effort       | Status                              | Notes   |
+| ----------- | ------ | ------------ | ------------ | ----------------------------------- | ------- |
 | P0/P1/P2/P3 | <item> | low/med/high | low/med/high | proposed/accepted/deferred/rejected | <notes> |
 
 ## 9. Known issues
 
-| ID | Issue | Severity | Owner / layer | Next action | Target |
-|---|---|---|---|---|---|
-| ISSUE-001 | <issue> | P0/P1/P2/P3 | <owner-or-layer> | <next action> | YYYY-MM-DD |
+| ID        | Issue                                           | Severity | Owner / layer | Next action                                        | Target |
+| --------- | ----------------------------------------------- | -------- | ------------- | -------------------------------------------------- | ------ |
+| ISSUE-001 | Docker Desktop engine is not reachable locally. | P1       | local infra   | Start Docker Desktop and rerun Compose validation. | none   |
 
 ## 10. Risks
 
-| ID | Risk | Probability | Impact | Mitigation | Owner | Trigger / watch signal |
-|---|---|---|---|---|---|---|
-| RISK-001 | <risk> | low/med/high | low/med/high | <mitigation> | <owner> | <signal> |
+| ID       | Risk                                           | Probability | Impact | Mitigation                                      | Owner | Trigger / watch signal |
+| -------- | ---------------------------------------------- | ----------- | ------ | ----------------------------------------------- | ----- | ---------------------- |
+| RISK-001 | Docker ports `5432` or `6379` may be occupied. | unknown     | medium | Do not kill processes; report conflict if seen. | User  | Compose start failure  |
 
 ## 11. Decisions since last update
 
-| ID | Date | Decision | Rationale | Tradeoff / consequence |
-|---|---|---|---|---|
-| DEC-001 | YYYY-MM-DD | <decision> | <why> | <tradeoff> |
+| ID      | Date       | Decision                                     | Rationale                                   | Tradeoff / consequence                            |
+| ------- | ---------- | -------------------------------------------- | ------------------------------------------- | ------------------------------------------------- |
+| DEC-001 | 2026-06-20 | Use pnpm workspace with local-only tooling.  | Matches requested stack and phase gating.   | Runtime dependencies deferred to later phases.    |
+| DEC-002 | 2026-06-20 | Use Docker Compose for PostgreSQL and Redis. | Matches future architecture requirements.   | Validation requires Docker Desktop to be running. |
+| DEC-003 | 2026-06-20 | Keep real provider APIs disabled by default. | Prevents paid/credentialed API use locally. | Later phases must use mocks unless approved.      |
 
 ## 12. Open questions
 
-| ID | Question | Owner | Needed by | Current best answer / assumption |
-|---|---|---|---|---|
-| Q-001 | <question> | <owner> | YYYY-MM-DD | <assumption> |
+| ID    | Question                                       | Owner | Needed by | Current best answer / assumption                 |
+| ----- | ---------------------------------------------- | ----- | --------- | ------------------------------------------------ |
+| Q-001 | Are local Docker ports `5432` and `6379` free? | User  | Phase 0   | Unknown until Docker Desktop validation can run. |
 
 ## 13. Next 3 actions
 
-1. <owner>: <action> — expected result: <result>
-2. <owner>: <action> — expected result: <result>
-3. <owner>: <action> — expected result: <result>
+1. User: Start Docker Desktop — expected result: Docker engine pipe is available.
+2. User/Codex: Run `docker compose -f .\infra\docker-compose.yml up -d`, `ps`, and `down` — expected result: PostgreSQL and Redis validation passes.
+3. User/Codex: Start Phase 1 only after Phase 0 is accepted — expected result: provider contracts and validation plan begin without real provider APIs.
 
 ## 14. Handoff notes
 
-- Start here next: <path/command/task ID>
-- Read first: <files/docs/issues>
-- Commands to run first: <commands>
-- Do not change: <protected paths/decisions/scope>
-- Watch for: <risk, flaky test, migration, hidden dependency>
-- Suggested next prompt: <prompt for next AI/Codex session>
+- Start here next: `TASK-001`
+- Read first: `README.md`, `CONTEXT.md`, `RUNBOOK.md`, `infra/docker-compose.yml`
+- Commands to run first: `docker compose -f .\infra\docker-compose.yml up -d`; `docker compose -f .\infra\docker-compose.yml ps`; `docker compose -f .\infra\docker-compose.yml down`
+- Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior during Phase 0 validation.
+- Watch for: Docker Desktop daemon state and port conflicts on `5432` / `6379`.
+- Suggested next prompt: `Docker Desktop is running. Please rerun Phase 0 Docker Compose validation and update STATE.md.`

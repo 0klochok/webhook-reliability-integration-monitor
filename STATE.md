@@ -9,7 +9,7 @@
 - Contributors: Codex
 - Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
 - Current branch: `main`
-- Current phase: Phase 0 — Foundation complete
+- Current phase: Phase 1 — Domain contracts complete
 - Overall status: green
 - Quality gate status: green
 - Completion: 100%
@@ -25,25 +25,26 @@
 
 ## 1. Current objective
 
-- Phase objective: Establish a clean pnpm workspace foundation for the TypeScript webhook reliability monitor.
+- Phase objective: Define pure core domain contracts for provider IDs, validation schemas, normalized events, status helpers, retry policy, adapters, and fake/local signature verification.
 - Deadline / target date: none
-- Definition of done: Workspace scaffold exists, dependencies are installed, local quality gates pass, Docker Compose local infra is validated, and no application behavior is implemented.
-- Primary user-visible signal: Root scripts and workspace directories exist and run local validation commands.
-- Secondary checks: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, Docker Compose up/ps/down, and `git status --short`.
-- Out of scope: Webhook handlers, signature verification, worker processing, dashboard logic, database business schema, simulator behavior, GitHub Actions, commits, pushes, tags, and real provider APIs.
+- Definition of done: Core contracts are implemented in `packages/core`, Zod is scoped to the core package, unit tests cover contract behavior, local quality gates pass, and no runtime ingress/persistence/queue/dashboard behavior is introduced.
+- Primary user-visible signal: `packages/core` exports provider metadata, schemas, normalized event contracts, retry helpers, signature contracts/helpers, and adapter registry with passing unit tests.
+- Secondary checks: `pnpm install`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`, and `git status --short`.
+- Out of scope: Hono routes, HTTP ingress behavior, persistence, Drizzle, PostgreSQL integration, Redis, BullMQ, workers, dashboard pages, simulator behavior, GitHub Actions, commits, pushes, tags, and real provider APIs.
 
 ## 2. Status snapshot
 
-- Summary: Phase 0 workspace foundation is implemented and validated. Node/pnpm quality gates pass, Docker Compose local PostgreSQL/Redis validation passes, and no application behavior is implemented.
-- Since last update: Reran frozen install, local quality gate, dependency/secret checks, and Docker Compose validation with Docker Desktop running.
-- Current focus: Ready for Phase 1 planning and provider contract/schema work.
-- Main uncertainty: none for Phase 0.
+- Summary: Phase 1 core domain contracts are implemented and locally validated. The project still has no API, database, queue, worker, dashboard, simulator, or real provider integration behavior.
+- Since last update: Added `zod` to `@webhook-monitor/core`, created core source modules, added synthetic fixtures and unit tests, and updated phase documentation.
+- Current focus: Ready for Phase 2 planning after user review and manual commit.
+- Main uncertainty: none for Phase 1.
 
 ## 3. Completed phases / milestones
 
-| Phase                | Date       | Summary                                         | Quality gate | Commit / PR |
-| -------------------- | ---------- | ----------------------------------------------- | ------------ | ----------- |
-| Phase 0 — Foundation | 2026-06-20 | pnpm workspace scaffold and local infra config. | green        | none        |
+| Phase                      | Date       | Summary                                                                                                | Quality gate | Commit / PR |
+| -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------ | ------------ | ----------- |
+| Phase 0 — Foundation       | 2026-06-20 | pnpm workspace scaffold and local infra config.                                                        | green        | none        |
+| Phase 1 — Domain contracts | 2026-06-20 | Core provider contracts, schemas, adapters, retry policy, statuses, and fake/local signature verifier. | green        | none        |
 
 ## 4. Completed since last update
 
@@ -51,23 +52,40 @@
 - 2026-06-20: Added local PostgreSQL and Redis Compose config — evidence: `infra/docker-compose.yml`.
 - 2026-06-20: Installed Phase 0 dev dependencies — evidence: `pnpm-lock.yaml` and root `devDependencies`.
 - 2026-06-20: Completed Phase 0.1 scaffold audit and Docker validation — evidence: `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `git diff --check`, and Docker Compose commands all passed.
+- 2026-06-20: Implemented Phase 1 core contracts — evidence: `packages/core/src`, `packages/core/test`, `packages/core/package.json`, and `pnpm-lock.yaml`.
+- 2026-06-20: Added Phase 1 documentation updates — evidence: `README.md`, `CONTEXT.md`, and `STATE.md`.
 
 ## 5. Changed files
 
-| Path                                          | Purpose                              | Status  | Notes                                     |
-| --------------------------------------------- | ------------------------------------ | ------- | ----------------------------------------- |
-| `package.json`, `pnpm-workspace.yaml`         | Root pnpm workspace and scripts      | created | No runtime app dependencies added.        |
-| `tsconfig.base.json`, `tsconfig.json`         | TypeScript baseline                  | created | ESM-oriented Node TypeScript config.      |
-| `eslint.config.js`, `.prettierrc.json`        | Lint and format tooling              | created | ESLint flat config and Prettier config.   |
-| `.gitignore`, `.editorconfig`, `.env.example` | Local repository defaults            | created | `.env.example` contains fake values only. |
-| `apps/*`, `packages/*`, `tools/simulator`     | Future workspace package directories | created | Package manifests only; no source code.   |
-| `infra/docker-compose.yml`                    | Local PostgreSQL and Redis services  | created | Named volumes and health checks.          |
-| `README.md`, `CONTEXT.md`, `RUNBOOK.md`       | Setup and workflow documentation     | updated | Phase 0 commands and constraints.         |
-| `REQ.md`, `DESIGN.md`, `TDD.md`, `STATE.md`   | Existing templates                   | updated | Formatted by Prettier.                    |
+| Path                                           | Purpose                              | Status  | Notes                                                                                            |
+| ---------------------------------------------- | ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------ |
+| `package.json`, `pnpm-workspace.yaml`          | Root pnpm workspace and scripts      | created | No runtime app dependencies added.                                                               |
+| `tsconfig.base.json`, `tsconfig.json`          | TypeScript baseline                  | created | ESM-oriented Node TypeScript config.                                                             |
+| `eslint.config.js`, `.prettierrc.json`         | Lint and format tooling              | created | ESLint flat config and Prettier config.                                                          |
+| `.gitignore`, `.editorconfig`, `.env.example`  | Local repository defaults            | created | `.env.example` contains fake values only.                                                        |
+| `apps/*`, `packages/*`, `tools/simulator`      | Future workspace package directories | created | Package manifests only; no source code.                                                          |
+| `infra/docker-compose.yml`                     | Local PostgreSQL and Redis services  | created | Named volumes and health checks.                                                                 |
+| `README.md`, `CONTEXT.md`, `RUNBOOK.md`        | Setup and workflow documentation     | updated | Phase 0 commands and constraints.                                                                |
+| `REQ.md`, `DESIGN.md`, `TDD.md`, `STATE.md`    | Existing templates                   | updated | Formatted by Prettier.                                                                           |
+| `packages/core/src`                            | Core domain contracts                | created | Pure TypeScript only; no ingress, DB, queue, or provider SDK.                                    |
+| `packages/core/test`                           | Core unit tests                      | created | Covers provider IDs, statuses, schemas, retry policy, adapters, and fake signature verification. |
+| `packages/core/package.json`, `pnpm-lock.yaml` | Core dependency metadata             | updated | Adds `zod` scoped to `@webhook-monitor/core`.                                                    |
 
 ## 6. Validation and quality gates
 
 ### Required gates
+
+### Phase 1 required gates
+
+| Gate       | Command              | Status | Evidence / notes                                    |
+| ---------- | -------------------- | ------ | --------------------------------------------------- |
+| install    | `pnpm install`       | pass   | Lockfile up to date after adding `zod`.             |
+| format     | `pnpm format:check`  | pass   | All matched files use Prettier code style.          |
+| lint       | `pnpm lint`          | pass   | ESLint completed with exit code 0.                  |
+| typecheck  | `pnpm typecheck`     | pass   | `tsc -b --pretty false` completed with exit code 0. |
+| unit tests | `pnpm test -- --run` | pass   | Vitest: 6 test files and 33 tests passed.           |
+| Docker     | not run              | n/a    | Phase 1 did not touch `infra` or require services.  |
+| git status | `git status --short` | pass   | Shows only intended Phase 1 working-tree changes.   |
 
 | Gate              | Command                                                                                                          | Status | Evidence / notes                                                                                                            |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------- |
@@ -101,10 +119,10 @@
 
 ## 7. Active tasks
 
-| ID       | Priority | Task                                                                            | Owner | Status | ETA  | Notes                                     |
-| -------- | -------- | ------------------------------------------------------------------------------- | ----- | ------ | ---- | ----------------------------------------- |
-| TASK-001 | P1       | Review Phase 0.1 validation result and commit manually when ready.              | User  | todo   | none | Do not commit or push from Codex.         |
-| TASK-002 | P1       | Start Phase 1 provider contracts and validation plan after Phase 0 is accepted. | User  | todo   | none | Keep mock/local-only external API policy. |
+| ID       | Priority | Task                                                             | Owner      | Status | ETA  | Notes                                     |
+| -------- | -------- | ---------------------------------------------------------------- | ---------- | ------ | ---- | ----------------------------------------- |
+| TASK-001 | P1       | Review Phase 1 validation result and commit manually when ready. | User       | todo   | none | Do not commit or push from Codex.         |
+| TASK-002 | P1       | Plan Phase 2 after Phase 1 is accepted.                          | User/Codex | todo   | none | Keep mock/local-only external API policy. |
 
 ## 8. Backlog / long horizon
 
@@ -140,15 +158,15 @@
 
 ## 13. Next 3 actions
 
-1. User: Review Phase 0.1 validation summary — expected result: Phase 0 accepted as complete.
-2. User: Commit manually when ready — expected result: Phase 0 foundation captured in Git history.
-3. User/Codex: Start Phase 1 — expected result: provider contracts and validation plan begin without real provider APIs.
+1. User: Review Phase 1 validation summary — expected result: Phase 1 accepted as complete.
+2. User: Commit manually when ready — expected result: Phase 1 core contracts captured in Git history.
+3. User/Codex: Plan Phase 2 — expected result: next phase begins without real provider APIs or scope creep.
 
 ## 14. Handoff notes
 
 - Start here next: `TASK-001`
-- Read first: `README.md`, `CONTEXT.md`, `RUNBOOK.md`, `infra/docker-compose.yml`
-- Commands to run first for Phase 1 setup check: `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test`; `docker compose -f .\infra\docker-compose.yml up -d`; `docker compose -f .\infra\docker-compose.yml ps`; `docker compose -f .\infra\docker-compose.yml down`
-- Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior during Phase 0 validation.
-- Watch for: Phase 1 scope creep and any request that would introduce real provider credentials or paid API usage.
-- Suggested next prompt: `Start Phase 1 provider contracts and validation plan in mock-only mode.`
+- Read first: `README.md`, `CONTEXT.md`, `packages/core/src/index.ts`, and `packages/core/test`
+- Commands to run first for Phase 2 setup check: `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test -- --run`
+- Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior outside the approved phase.
+- Watch for: Phase 2 scope creep and any request that would introduce real provider credentials or paid API usage.
+- Suggested next prompt: `Start Phase 2 planning in mock-only mode after reviewing Phase 1.`

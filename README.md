@@ -6,6 +6,12 @@ idempotent processing, retry handling, dead-letter recovery, and integration hea
 Phase 0 only establishes the repository foundation. It does not implement webhook handlers,
 signature verification, database schema, worker processing, dashboard logic, or simulator behavior.
 
+Phase 1 defines pure core domain contracts in `packages/core`: provider IDs and metadata for
+`stripe-sample`, `generic-http`, and `mock-crm`; Zod validation schemas for local sample payloads;
+a provider-independent normalized event contract; retry policy helpers; provider adapters; and
+fake/local-only Stripe-style HMAC signature verification. There is still no database, queue,
+worker, HTTP ingress, dashboard, simulator behavior, real provider API usage, or real credentials.
+
 ## Problem Statement
 
 Business automations often depend on webhooks from payment providers, CRMs, scheduling tools, and

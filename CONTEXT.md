@@ -27,7 +27,7 @@ When information is unknown, write `TBD` and add it to **18. Open questions**. D
 | Last updated    | 2026-06-20                                                                                                    |
 | Owner           | Local project owner                                                                                           |
 | Status          | active                                                                                                        |
-| Current phase   | Phase 0 — Foundation                                                                                          |
+| Current phase   | Phase 1 — Domain contracts                                                                                    |
 | Repository      | webhook-reliability-integration-monitor / https://github.com/0klochok/webhook-reliability-integration-monitor |
 | Primary runtime | local                                                                                                         |
 
@@ -45,8 +45,8 @@ When information is unknown, write `TBD` and add it to **18. Open questions**. D
 - **Primary users:** Developers and operators evaluating webhook reliability patterns.
 - **Problem solved:** Demonstrates planned durable webhook ingestion, idempotency, retries, dead-letter handling, replay, and health visibility.
 - **High-level architecture:** Provider webhook -> Hono ingress -> adapter -> validation/signature checks -> PostgreSQL storage -> BullMQ worker/retry flow -> dashboard/replay.
-- **Current architecture:** Phase 0 pnpm workspace scaffold with local PostgreSQL and Redis Docker Compose only.
-- **Current phase:** Phase 0 — repository foundation.
+- **Current architecture:** Phase 1 pnpm workspace with pure core domain contracts in `packages/core`; local PostgreSQL and Redis Docker Compose remain configured for later phases only.
+- **Current phase:** Phase 1 — domain contracts, provider model, validation schemas, normalized events, retry policy, adapters, and fake/local signature verification.
 - **Main runtime surfaces:**
   - Frontend/UI: planned server-rendered Hono dashboard in `apps/api`.
   - Backend/API: planned Hono API in `apps/api`.
@@ -58,7 +58,12 @@ When information is unknown, write `TBD` and add it to **18. Open questions**. D
   2.
   3.
 - **Core modules:**
-  - `<module>`:
+  - `packages/core/src/providers.ts`: provider IDs, metadata, and runtime provider validation.
+  - `packages/core/src/schemas`: Zod schemas for local Stripe-style, generic HTTP, and mock CRM sample payloads.
+  - `packages/core/src/adapters.ts`: framework-agnostic provider adapters and adapter registry.
+  - `packages/core/src/normalized-event.ts`: provider-independent normalized event contract and payload hashing.
+  - `packages/core/src/retry-policy.ts`: pure retry policy contract and delay/status helpers.
+  - `packages/core/src/signature.ts`: generic signature verifier contracts and fake Stripe-style HMAC verifier.
 - ## **Non-goals / out of scope:**
 
 ---
@@ -96,17 +101,17 @@ If files conflict, resolve in this order unless the project defines a stricter r
 
 Keep paths exact. Add only directories/files that matter for implementation, operations, or review.
 
-| Path               | Purpose                                                                   | Notes / owner                                                                   |
-| ------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `/`                | Project root                                                              |                                                                                 |
-| `/apps/api`        | Planned Hono API, webhook ingress, dashboard, health endpoints            | Package manifest only in Phase 0                                                |
-| `/apps/worker`     | Planned BullMQ worker and retry processing                                | Package manifest only in Phase 0                                                |
-| `/packages/core`   | Planned provider contracts, schemas, signatures, idempotency/status model | Package manifest only in Phase 0                                                |
-| `/packages/db`     | Planned Drizzle schema, migrations, repository layer                      | Package manifest only in Phase 0                                                |
-| `/packages/queue`  | Planned queue names, job contracts, enqueue helpers, retry policy         | Package manifest only in Phase 0                                                |
-| `/tools/simulator` | Planned local demo/simulator commands                                     | Package manifest only in Phase 0                                                |
-| `/infra`           | Local infrastructure definitions                                          | Docker Compose for PostgreSQL and Redis                                         |
-| `/docs`            | Project documentation                                                     | Holder for later architecture notes, demo script, and manual verification notes |
+| Path               | Purpose                                                                       | Notes / owner                                                                   |
+| ------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `/`                | Project root                                                                  |                                                                                 |
+| `/apps/api`        | Planned Hono API, webhook ingress, dashboard, health endpoints                | Package manifest only in Phase 0                                                |
+| `/apps/worker`     | Planned BullMQ worker and retry processing                                    | Package manifest only in Phase 0                                                |
+| `/packages/core`   | Provider contracts, schemas, signatures, status model, adapters, retry policy | Phase 1 pure TypeScript source and unit tests implemented                       |
+| `/packages/db`     | Planned Drizzle schema, migrations, repository layer                          | Package manifest only in Phase 0                                                |
+| `/packages/queue`  | Planned queue names, job contracts, enqueue helpers, retry policy             | Package manifest only in Phase 0                                                |
+| `/tools/simulator` | Planned local demo/simulator commands                                         | Package manifest only in Phase 0                                                |
+| `/infra`           | Local infrastructure definitions                                              | Docker Compose for PostgreSQL and Redis                                         |
+| `/docs`            | Project documentation                                                         | Holder for later architecture notes, demo script, and manual verification notes |
 
 ### Important generated or ignored paths
 
@@ -125,7 +130,8 @@ Keep paths exact. Add only directories/files that matter for implementation, ope
 | Backend                   | Hono planned                             | No API implementation in Phase 0                    |
 | Runtime                   | Node.js + TypeScript                     | Local Node observed as `v24.16.0`                   |
 | Package manager           | pnpm                                     | Local pnpm observed as `11.7.0`                     |
-| Frameworks                | Hono planned later                       | Not installed in Phase 0                            |
+| Frameworks                | Hono planned later                       | Not installed in Phase 1                            |
+| Runtime validation        | Zod                                      | Installed only in `@webhook-monitor/core`           |
 | Database/storage          | PostgreSQL planned                       | Local Docker Compose service only in Phase 0        |
 | Queue/background jobs     | BullMQ planned                           | Not installed in Phase 0                            |
 | Cache                     | Redis planned                            | Local Docker Compose service only in Phase 0        |
@@ -133,7 +139,7 @@ Keep paths exact. Add only directories/files that matter for implementation, ope
 | Auth provider             | TBD                                      |                                                     |
 | External services         | TBD                                      |                                                     |
 | Third-party SDKs          | TBD                                      |                                                     |
-| Testing                   | Vitest                                   | Configured to pass with no tests in Phase 0         |
+| Testing                   | Vitest                                   | Phase 1 has unit tests for core contracts           |
 | Tooling                   | TypeScript, ESLint flat config, Prettier | Root scripts in `package.json`                      |
 | Docker                    | configured                               | `infra/docker-compose.yml` for PostgreSQL and Redis |
 | Hosting/deployment target | TBD                                      |                                                     |
@@ -388,11 +394,11 @@ Record durable decisions here or link to full ADR files. Prefer separate ADR fil
 
 ## 15. Current constraints
 
-| Constraint                               | Type       | Impact                                             | Notes                                                  |
-| ---------------------------------------- | ---------- | -------------------------------------------------- | ------------------------------------------------------ |
-| Real provider APIs disabled by default   | security   | Prevents accidental paid or credentialed API usage | Use mocks/local-only values unless explicitly approved |
-| GitHub Actions not configured in Phase 0 | deployment | Validation is local-first                          | Add CI only in a later requested phase                 |
-| No application behavior in Phase 0       | technical  | Scaffold only                                      | Implement handlers/workers/dashboard in later phases   |
+| Constraint                                       | Type       | Impact                                             | Notes                                                  |
+| ------------------------------------------------ | ---------- | -------------------------------------------------- | ------------------------------------------------------ |
+| Real provider APIs disabled by default           | security   | Prevents accidental paid or credentialed API usage | Use mocks/local-only values unless explicitly approved |
+| GitHub Actions not configured in Phase 0         | deployment | Validation is local-first                          | Add CI only in a later requested phase                 |
+| No ingress, persistence, queue, or UI in Phase 1 | technical  | Core contracts only                                | Implement handlers/workers/dashboard in later phases   |
 
 ---
 

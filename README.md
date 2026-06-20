@@ -3,14 +3,17 @@
 A local-first TypeScript portfolio project for demonstrating reliable webhook ingestion,
 idempotent processing, retry handling, dead-letter recovery, and integration health monitoring.
 
-Phase 0 only establishes the repository foundation. It does not implement webhook handlers,
-signature verification, database schema, worker processing, dashboard logic, or simulator behavior.
-
 Phase 1 defines pure core domain contracts in `packages/core`: provider IDs and metadata for
 `stripe-sample`, `generic-http`, and `mock-crm`; Zod validation schemas for local sample payloads;
 a provider-independent normalized event contract; retry policy helpers; provider adapters; and
-fake/local-only Stripe-style HMAC signature verification. There is still no database, queue,
+fake/local-only Stripe-style HMAC signature verification. Phase 1 did not add database, queue,
 worker, HTTP ingress, dashboard, simulator behavior, real provider API usage, or real credentials.
+
+Phase 2 adds PostgreSQL-backed persistence in `packages/db` with Drizzle schema and migrations,
+repository-layer behavior, idempotent event storage, status history, delivery attempts,
+dead-letter records, manual replay audit records, local reset/seed scripts, and integration tests
+against local PostgreSQL. There is still no HTTP ingress, Hono route, queue behavior, worker,
+dashboard, simulator behavior, real provider API usage, or real credentials.
 
 ## Problem Statement
 
@@ -72,6 +75,41 @@ pnpm install
 
 Copy `.env.example` to `.env` only when a future phase requires local environment values. The
 example file uses fake local-only values.
+
+## Phase 2 Local Database
+
+Phase 2 stores canonical webhook state in PostgreSQL through Drizzle. The generated migration
+creates these tables:
+
+- `webhook_events`
+- `event_status_history`
+- `delivery_attempts`
+- `dead_letter_events`
+- `manual_replays`
+
+The main idempotency guarantee is the unique database constraint on
+`(provider_id, external_event_id)` in `webhook_events`. Reset and seed scripts are local-only:
+they refuse destructive cleanup when `DATABASE_URL` does not point to a known local host and local
+demo/test database name. Seed data is fake and deterministic. Use `pnpm db:reset` when you need to
+truncate only application tables while preserving Drizzle migration metadata.
+
+Run Phase 2 commands from the repository root:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml up -d postgres
+pnpm install
+pnpm db:generate
+pnpm db:migrate
+pnpm db:seed
+pnpm test -- --run
+pnpm lint
+pnpm typecheck
+docker compose -f .\infra\docker-compose.yml ps
+git status --short
+```
+
+`pnpm format:check` is also part of the repository quality gate. `pnpm db:studio` is available for
+manual inspection, but it is not a blocking validation command because it may keep a process open.
 
 ## Phase 0 Validation Commands
 

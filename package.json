@@ -14,6 +14,11 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
+    "db:generate": "pnpm --filter @webhook-monitor/db db:generate",
+    "db:migrate": "pnpm --filter @webhook-monitor/db db:migrate",
+    "db:reset": "pnpm --filter @webhook-monitor/db db:reset",
+    "db:seed": "pnpm --filter @webhook-monitor/db db:seed",
+    "db:studio": "pnpm --filter @webhook-monitor/db db:studio",
     "docker:up": "docker compose -f .\\infra\\docker-compose.yml up -d",
     "docker:down": "docker compose -f .\\infra\\docker-compose.yml down",
     "docker:ps": "docker compose -f .\\infra\\docker-compose.yml ps"

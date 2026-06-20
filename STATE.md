@@ -9,7 +9,7 @@
 - Contributors: Codex
 - Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
 - Current branch: `main`
-- Current phase: Phase 1 — Domain contracts complete
+- Current phase: Phase 2 — Persistence and migrations complete
 - Overall status: green
 - Quality gate status: green
 - Completion: 100%
@@ -25,18 +25,18 @@
 
 ## 1. Current objective
 
-- Phase objective: Define pure core domain contracts for provider IDs, validation schemas, normalized events, status helpers, retry policy, adapters, and fake/local signature verification.
+- Phase objective: Add PostgreSQL-backed persistence, Drizzle schema/migrations, repository-layer behavior, idempotency constraints, local reset/seed scripts, and integration tests against local PostgreSQL.
 - Deadline / target date: none
-- Definition of done: Core contracts are implemented in `packages/core`, Zod is scoped to the core package, unit tests cover contract behavior, local quality gates pass, and no runtime ingress/persistence/queue/dashboard behavior is introduced.
-- Primary user-visible signal: `packages/core` exports provider metadata, schemas, normalized event contracts, retry helpers, signature contracts/helpers, and adapter registry with passing unit tests.
-- Secondary checks: `pnpm install`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`, and `git status --short`.
-- Out of scope: Hono routes, HTTP ingress behavior, persistence, Drizzle, PostgreSQL integration, Redis, BullMQ, workers, dashboard pages, simulator behavior, GitHub Actions, commits, pushes, tags, and real provider APIs.
+- Definition of done: `packages/db` implements schema, migrations, client helpers, repositories, safe reset/seed commands, and integration tests; local Postgres validation passes; no ingress, queue, worker, dashboard, simulator, or real provider API behavior is introduced.
+- Primary user-visible signal: `pnpm db:migrate`, `pnpm db:seed`, and `pnpm test -- --run` work against local PostgreSQL.
+- Secondary checks: `pnpm install`, `pnpm db:generate`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, Docker Compose Postgres health, and `git status --short`.
+- Out of scope: Hono routes, HTTP ingress behavior, Redis/BullMQ behavior, workers, downstream delivery, dashboard pages, simulator behavior, GitHub Actions, commits, pushes, tags, and real provider APIs.
 
 ## 2. Status snapshot
 
-- Summary: Phase 1 core domain contracts are implemented and locally validated. The project still has no API, database, queue, worker, dashboard, simulator, or real provider integration behavior.
-- Since last update: Added `zod` to `@webhook-monitor/core`, created core source modules, added synthetic fixtures and unit tests, and updated phase documentation.
-- Current focus: Ready for Phase 2 planning after user review and manual commit.
+- Summary: Phase 2 persistence is implemented and locally validated. The project now has PostgreSQL schema/migrations, db repositories, safe local reset/seed scripts, and db integration tests. It still has no API, queue, worker, dashboard, simulator behavior, or real provider integration behavior.
+- Since last update: Added Drizzle/postgres persistence in `@webhook-monitor/db`, generated initial migration, added integration tests, updated README, and validated against local Docker PostgreSQL.
+- Current focus: Ready for user review and manual commit, then Phase 3 webhook ingress API planning/implementation.
 - Main uncertainty: none for Phase 1.
 
 ## 3. Completed phases / milestones
@@ -45,6 +45,7 @@
 | -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------ | ------------ | ----------- |
 | Phase 0 — Foundation       | 2026-06-20 | pnpm workspace scaffold and local infra config.                                                        | green        | none        |
 | Phase 1 — Domain contracts | 2026-06-20 | Core provider contracts, schemas, adapters, retry policy, statuses, and fake/local signature verifier. | green        | none        |
+| Phase 2 — Persistence      | 2026-06-20 | PostgreSQL persistence, Drizzle migrations, db repositories, local reset/seed, and integration tests.  | green        | none        |
 
 ## 4. Completed since last update
 
@@ -54,6 +55,8 @@
 - 2026-06-20: Completed Phase 0.1 scaffold audit and Docker validation — evidence: `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `git diff --check`, and Docker Compose commands all passed.
 - 2026-06-20: Implemented Phase 1 core contracts — evidence: `packages/core/src`, `packages/core/test`, `packages/core/package.json`, and `pnpm-lock.yaml`.
 - 2026-06-20: Added Phase 1 documentation updates — evidence: `README.md`, `CONTEXT.md`, and `STATE.md`.
+- 2026-06-20: Implemented Phase 2 persistence — evidence: `packages/db/src`, `packages/db/drizzle`, `packages/db/test`, `drizzle.config.ts`, db scripts in `package.json`, and `pnpm-lock.yaml`.
+- 2026-06-20: Validated Phase 2 locally — evidence: `pnpm install`, `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:reset`, `pnpm db:seed`, `pnpm test -- --run`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, Docker Compose Postgres health, and `git status --short`.
 
 ## 5. Changed files
 
@@ -70,10 +73,40 @@
 | `packages/core/src`                            | Core domain contracts                | created | Pure TypeScript only; no ingress, DB, queue, or provider SDK.                                    |
 | `packages/core/test`                           | Core unit tests                      | created | Covers provider IDs, statuses, schemas, retry policy, adapters, and fake signature verification. |
 | `packages/core/package.json`, `pnpm-lock.yaml` | Core dependency metadata             | updated | Adds `zod` scoped to `@webhook-monitor/core`.                                                    |
+| `drizzle.config.ts`                            | Drizzle Kit config                   | created | Used by db package scripts; reads `.env` or fake local `.env.example` values.                    |
+| `packages/db/src`                              | Persistence implementation           | created | Schema, client, migration runner, repositories, reset/seed helpers, and local safety checks.     |
+| `packages/db/drizzle`                          | Generated migrations                 | created | Initial Drizzle migration and metadata for Phase 2 tables/enums/indexes.                         |
+| `packages/db/test`                             | DB integration tests                 | created | Covers migrations, repositories, idempotency, history, attempts, dead letters, replays, safety.  |
+| `packages/db/package.json`, `pnpm-lock.yaml`   | DB dependencies and scripts          | updated | Adds Drizzle, postgres.js, dotenv, drizzle-kit, tsx, and `@webhook-monitor/core`.                |
+| `.env.example`, `README.md`                    | Local env/docs                       | updated | Adds `POSTGRES_PORT` and Phase 2 local database instructions.                                    |
 
 ## 6. Validation and quality gates
 
 ### Required gates
+
+### Phase 2 required gates
+
+| Gate               | Command                                                       | Status | Evidence / notes                                                        |
+| ------------------ | ------------------------------------------------------------- | ------ | ----------------------------------------------------------------------- |
+| Postgres start     | `docker compose -f .\infra\docker-compose.yml up -d postgres` | pass   | Created/started `webhook-monitor-postgres`.                             |
+| install            | `pnpm install`                                                | pass   | Scope all 7 workspace projects; already up to date on final run.        |
+| migration generate | `pnpm db:generate`                                            | pass   | Initial migration generated; final rerun reported no schema changes.    |
+| migration apply    | `pnpm db:migrate`                                             | pass   | Drizzle migrations applied using fake local `.env.example` values.      |
+| reset              | `pnpm db:reset`                                               | pass   | Local-only reset truncated application tables and preserved migrations. |
+| seed               | `pnpm db:seed`                                                | pass   | Fake deterministic demo records seeded through local-only safety path.  |
+| tests              | `pnpm test -- --run`                                          | pass   | Vitest: 7 test files and 43 tests passed.                               |
+| format             | `pnpm format:check`                                           | pass   | `All matched files use Prettier code style!`.                           |
+| lint               | `pnpm lint`                                                   | pass   | `eslint .` completed with exit code 0.                                  |
+| typecheck          | `pnpm typecheck`                                              | pass   | `tsc -b --pretty false` completed with exit code 0.                     |
+| Docker ps          | `docker compose -f .\infra\docker-compose.yml ps`             | pass   | `webhook-monitor-postgres` was `Up` and `healthy` on `5432`.            |
+| git status         | `git status --short`                                          | pass   | Shows intended Phase 2 modified/untracked files only.                   |
+
+### Phase 2 optional / skipped gates
+
+| Gate       | Status  | Reason                                                                       | Follow-up                                       |
+| ---------- | ------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| db studio  | skipped | `pnpm db:studio` is manual and may keep a long-running process open.         | Use manually to inspect local tables if needed. |
+| API/worker | n/a     | Phase 2 intentionally does not implement ingress, queue, or worker behavior. | Revisit in Phase 3+.                            |
 
 ### Phase 1 required gates
 
@@ -121,8 +154,8 @@
 
 | ID       | Priority | Task                                                             | Owner      | Status | ETA  | Notes                                     |
 | -------- | -------- | ---------------------------------------------------------------- | ---------- | ------ | ---- | ----------------------------------------- |
-| TASK-001 | P1       | Review Phase 1 validation result and commit manually when ready. | User       | todo   | none | Do not commit or push from Codex.         |
-| TASK-002 | P1       | Plan Phase 2 after Phase 1 is accepted.                          | User/Codex | todo   | none | Keep mock/local-only external API policy. |
+| TASK-001 | P1       | Review Phase 2 validation result and commit manually when ready. | User       | todo   | none | Do not commit or push from Codex.         |
+| TASK-002 | P1       | Plan Phase 3 webhook ingress API after Phase 2 is accepted.      | User/Codex | todo   | none | Keep mock/local-only external API policy. |
 
 ## 8. Backlog / long horizon
 
@@ -160,13 +193,13 @@
 
 1. User: Review Phase 1 validation summary — expected result: Phase 1 accepted as complete.
 2. User: Commit manually when ready — expected result: Phase 1 core contracts captured in Git history.
-3. User/Codex: Plan Phase 2 — expected result: next phase begins without real provider APIs or scope creep.
+3. User/Codex: Plan Phase 3 webhook ingress API — expected result: HTTP ingress begins without queue/worker/dashboard scope creep.
 
 ## 14. Handoff notes
 
 - Start here next: `TASK-001`
 - Read first: `README.md`, `CONTEXT.md`, `packages/core/src/index.ts`, and `packages/core/test`
-- Commands to run first for Phase 2 setup check: `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test -- --run`
+- Commands to run first for Phase 3 setup check: `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test -- --run`
 - Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior outside the approved phase.
-- Watch for: Phase 2 scope creep and any request that would introduce real provider credentials or paid API usage.
-- Suggested next prompt: `Start Phase 2 planning in mock-only mode after reviewing Phase 1.`
+- Watch for: Phase 3 scope creep and any request that would introduce queues, workers, dashboard behavior, real provider credentials, or paid API usage before those are approved.
+- Suggested next prompt: `Start Phase 3 webhook ingress API in mock-only mode after reviewing Phase 2.`

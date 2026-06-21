@@ -243,11 +243,12 @@ mock behavior is controlled by `generic-http` payload fields such as
 `payload.deliveryBehavior`. Supported values are `success`, `fail-once-then-success`,
 `fail-twice-then-success`, `always-retryable-fail`, and `permanent-fail`.
 
-Start the local infrastructure, migrate the database, and run the API:
+### Phase 4 local manual QA
+
+Start the local infrastructure, migrate the database, and run the API from the repository root:
 
 ```powershell
 docker compose -f .\infra\docker-compose.yml up -d postgres redis
-pnpm install
 pnpm db:migrate
 pnpm dev:api
 ```
@@ -258,8 +259,12 @@ pnpm dev:api
 pnpm dev:worker
 ```
 
-`pnpm dev:worker` is also long-running. In a third PowerShell terminal, send a successful delivery
-scenario:
+`pnpm dev:worker` is also long-running. In a third PowerShell terminal, send the manual QA
+webhooks. If you have already sent these exact event IDs, either change all three `eventId` and
+`idempotencyKey` values to new unique strings, or intentionally reset local app data first with the
+local-only `pnpm db:reset` command.
+
+Send a successful delivery scenario:
 
 ```powershell
 $successBody = @{
@@ -281,7 +286,8 @@ Invoke-RestMethod `
   -Body $successBody
 ```
 
-Send a retry-then-success scenario:
+Send a retry-then-success scenario. The payload shape matches the `generic-http` test fixture, with
+the mock worker behavior selected by `payload.deliveryBehavior`:
 
 ```powershell
 $retryBody = @{
@@ -303,7 +309,7 @@ Invoke-RestMethod `
   -Body $retryBody
 ```
 
-Send a dead-letter scenario:
+Send a permanent-failure dead-letter scenario:
 
 ```powershell
 $deadLetterBody = @{
@@ -314,7 +320,7 @@ $deadLetterBody = @{
   idempotencyKey = "generic-phase4-dead-letter-1"
   payload = @{
     orderId = "order_phase4_dead_letter_123"
-    deliveryBehavior = "always-retryable-fail"
+    deliveryBehavior = "permanent-fail"
   }
 } | ConvertTo-Json -Depth 6 -Compress
 
@@ -325,9 +331,38 @@ Invoke-RestMethod `
   -Body $deadLetterBody
 ```
 
-Use `pnpm db:studio` or SQL inspection manually if you want to inspect `delivery_attempts`,
-`event_status_history`, and `dead_letter_events`. The worker handles `SIGINT` and `SIGTERM` by
-closing the BullMQ worker, Redis connection, and database client.
+To verify retry exhaustion instead of a permanent failure, send the same dead-letter payload with a
+new `eventId` / `idempotencyKey` and `deliveryBehavior = "always-retryable-fail"`. With the
+`.env.example` defaults, the worker uses three max attempts and schedules the first retry after about
+one second.
+
+After sending the webhooks, wait a few seconds for the worker to finish retry processing, then inspect
+the local database through the existing Postgres container:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c "select external_event_id, current_status, last_successful_at from webhook_events where external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1') order by external_event_id;"
+
+docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c "select e.external_event_id, a.attempt_number, a.status, a.http_status_code, a.error_code from delivery_attempts a join webhook_events e on e.id = a.event_id where e.external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1') order by e.external_event_id, a.attempt_number;"
+
+docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c "select e.external_event_id, h.from_status, h.to_status, h.reason_code from event_status_history h join webhook_events e on e.id = h.event_id where e.external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1') order by e.external_event_id, h.created_at;"
+
+docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c "select e.external_event_id, d.reason_code, d.final_attempt_number from dead_letter_events d join webhook_events e on e.id = d.event_id where e.external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1') order by e.external_event_id;"
+```
+
+Expected manual QA results:
+
+| Scenario                 | Expected event status | Expected delivery attempts                                    | Expected dead-letter row                                           |
+| ------------------------ | --------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------ |
+| success                  | `delivered`           | attempt `1` is `succeeded`                                    | none                                                               |
+| retry then success       | `delivered`           | attempt `1` is `failed_retryable`; attempt `2` is `succeeded` | none                                                               |
+| permanent failure        | `dead_lettered`       | attempt `1` is `failed_permanent`                             | `reason_code=permanent_delivery_failure`, `final_attempt_number=1` |
+| retry exhaustion variant | `dead_lettered`       | attempts `1..3` are `failed_retryable`                        | `reason_code=max_attempts_exhausted`, `final_attempt_number=3`     |
+
+There is no dedicated simulator CLI or fully automated manual-QA helper yet. Phase 4 E2E verification
+is currently documented as manual PowerShell requests plus SQL inspection. `pnpm db:studio` remains
+available for interactive inspection, but it is not a blocking validation command because it keeps a
+long-running process open. The worker handles `SIGINT` and `SIGTERM` by closing the BullMQ worker,
+Redis connection, and database client.
 
 Phase 4 validation commands:
 

@@ -9,7 +9,7 @@
 - Contributors: Codex
 - Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
 - Current branch: `main`
-- Current phase: Phase 4 — Queue, worker, retry, and dead-letter behavior complete
+- Current phase: Phase 4.2 — Manual QA recording docs patch
 - Overall status: green
 - Quality gate status: green
 - Completion: 100%
@@ -25,18 +25,18 @@
 
 ## 1. Current objective
 
-- Phase objective: Replace the Phase 3 queue placeholder with BullMQ/Redis delivery jobs and add a local worker that records delivery attempts, retries mock downstream failures, and dead-letters exhausted/permanent failures.
+- Phase objective: Record provided Phase 4 manual webhook E2E QA evidence in docs without product code, test, dependency, migration, workspace, or infra changes.
 - Deadline / target date: none
-- Definition of done: valid newly inserted webhooks enqueue one BullMQ delivery job; the worker consumes jobs, records `delivery_attempts`, transitions event status/history, retries retryable mock failures with capped exponential backoff, marks success as `delivered`, and creates `dead_letter_events` for exhausted/permanent failures.
-- Primary user-visible signal: `pnpm dev:api` and `pnpm dev:worker` boot locally with Postgres/Redis running; a `generic-http` payload with `payload.deliveryBehavior` drives success, retry-success, and dead-letter demo behavior.
-- Secondary checks: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`, `pnpm install`, `pnpm db:generate`, `pnpm db:migrate`, `pnpm test -- --run`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, long-running command smoke checks, and `git status --short`.
+- Definition of done: `STATE.md` records the provided success, retry-then-success, and permanent dead-letter manual QA evidence as passed; the optional retry-exhaustion variant is recorded as not run; README dead-letter SQL inspection covers all three manual QA event IDs.
+- Primary user-visible signal: Phase 4 manual QA status in `STATE.md` reflects the provided local API/worker/SQL inspection evidence.
+- Secondary checks: `docker compose -f .\infra\docker-compose.yml ps`, `git diff --check`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`, `pnpm -r --if-present build`, and `git status --short`.
 - Out of scope: dashboard pages, manual replay UI, simulator commands, GitHub Actions, commits, pushes, tags, app containers, provider SDKs, real provider APIs, and paid API usage.
 
 ## 2. Status snapshot
 
-- Summary: Phase 4 queue/worker behavior is implemented and locally validated. The API now uses the real BullMQ delivery queue at runtime, while tests still inject fakes. The worker processes fake/local downstream delivery, persists attempts/history/dead-letter records, and shuts down cleanly.
-- Since last update: Added BullMQ/ioredis queue implementation, worker runtime, mock downstream behavior, idempotent DB helpers, Phase 4 tests, worker scripts, `.env.example` worker/retry values, and README manual verification notes.
-- Current focus: Ready for user review and manual commit, then Phase 5 planning.
+- Summary: Phase 4 queue/worker behavior remains implemented and locally validated. Phase 4.2 is a docs-only QA recording patch for the provided local manual webhook E2E evidence; no product code, tests, dependencies, migrations, workspace, or infra files were changed.
+- Since last update: Recorded provided Phase 4 manual QA evidence for success, retry-then-success, and permanent dead-letter flows; marked retry exhaustion as optional and not run; confirmed no dedicated simulator CLI or automated manual-QA helper exists yet; kept `pnpm db:studio` as interactive/non-blocking.
+- Current focus: Ready for user review, manual commit, then Phase 5 planning.
 - Main uncertainty: none for Phase 4.
 
 ## 3. Completed phases / milestones
@@ -48,6 +48,8 @@
 | Phase 2 — Persistence      | 2026-06-20 | PostgreSQL persistence, Drizzle migrations, db repositories, local reset/seed, and integration tests.  | green        | none        |
 | Phase 3 — Ingress API      | 2026-06-20 | Hono webhook ingress, raw-body signatures, validation, idempotency, audit history, and queue port.     | green        | none        |
 | Phase 4 — Queue / worker   | 2026-06-21 | BullMQ queue, worker processing, retries, delivery attempts, and dead-letter behavior.                 | green        | none        |
+| Phase 4.1 — Verification   | 2026-06-21 | Docs-only manual QA and validation-status clarification for Phase 4 webhook E2E checks.                | green        | none        |
+| Phase 4.2 — QA recording   | 2026-06-21 | Docs-only recording of provided Phase 4 manual webhook E2E QA evidence and skip reasons.               | green        | none        |
 
 ## 4. Completed since last update
 
@@ -63,6 +65,8 @@
 - 2026-06-20: Validated Phase 3 locally — evidence: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`, `pnpm install`, `pnpm db:migrate`, `pnpm test -- --run`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, and `pnpm dev:api` health smoke passed.
 - 2026-06-21: Recorded Phase 3 manual webhook ingress QA as passed — evidence: `/healthz` OK, `generic-http` fresh/duplicate/invalid-payload paths, unsupported-provider 404, `stripe-sample` local missing-secret and bad-signature paths, and final `pnpm test` pass after Docker PostgreSQL/Redis were started.
 - 2026-06-21: Implemented and validated Phase 4 queue/worker behavior — evidence: `packages/queue/src`, `packages/queue/test`, `apps/worker/src`, `apps/worker/test`, API BullMQ runtime wiring, DB idempotency helpers, README/env updates, and required validation gates passing.
+- 2026-06-21: Added Phase 4.1 verification docs patch — evidence: `README.md` manual QA steps and this `STATE.md` validation split.
+- 2026-06-21: Added Phase 4.2 docs-only QA recording patch — evidence: `STATE.md` records provided manual QA pass evidence for success, retry-then-success, and permanent dead-letter flows; `README.md` dead-letter SQL now checks all three manual QA event IDs.
 
 ## 5. Changed files
 
@@ -99,34 +103,69 @@
 | `packages/db/src/repositories`, `packages/db/test`                | Worker persistence helpers           | updated | Adds idempotent delivery-attempt and dead-letter helpers with tests; no schema migration needed.                 |
 | `.env.example`, `README.md`, `STATE.md`                           | Phase 4 local docs/status            | updated | Adds fake worker/retry/mock downstream values and manual Phase 4 verification instructions.                      |
 | `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`           | Phase 4 scripts/dependencies         | updated | Adds BullMQ/ioredis/zod queue dependencies, worker scripts, and explicit pnpm build policy.                      |
+| `README.md`, `STATE.md`                                           | Phase 4.1 verification docs/status   | updated | Clarifies manual webhook E2E QA, SQL inspection, and validation categories; no product code changes.             |
+| `README.md`, `STATE.md`                                           | Phase 4.2 manual QA evidence record  | updated | Docs-only patch recording provided manual QA evidence and skip reasons; no product/test/dependency changes.      |
 
 ## 6. Validation and quality gates
 
 ### Required gates
 
-### Phase 4 required gates
+### Phase 4.2 docs-only QA recording patch validation
 
-| Gate            | Command                                                             | Status | Evidence / notes                                                                                                                    |
-| --------------- | ------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Docker services | `docker compose -f .\infra\docker-compose.yml up -d postgres redis` | pass   | `webhook-monitor-postgres` and `webhook-monitor-redis` were already running.                                                        |
-| install         | `pnpm install`                                                      | pass   | Lockfile was up to date after dependency additions; pnpm `v11.7.0`.                                                                 |
-| migration gen   | `pnpm db:generate`                                                  | pass   | Drizzle reported no schema changes and nothing to migrate.                                                                          |
-| migration apply | `pnpm db:migrate`                                                   | pass   | Existing Drizzle schema/migration tables detected; migrations applied successfully.                                                 |
-| tests           | `pnpm test -- --run`                                                | pass   | Final Vitest run: 14 test files and 72 tests passed. Initial run exposed BullMQ job-id and test-ordering issues, then rerun passed. |
-| format          | `pnpm format:check`                                                 | pass   | Final run: `All matched files use Prettier code style!`; first run identified 9 files and targeted formatting fixed them.           |
-| lint            | `pnpm lint`                                                         | pass   | `eslint .` completed with exit code 0.                                                                                              |
-| typecheck       | `pnpm typecheck`                                                    | pass   | Final `tsc -b --pretty false` completed with exit code 0 after fixing BullMQ/ioredis type boundaries.                               |
-| dev API smoke   | `pnpm dev:api` plus `GET http://localhost:3000/healthz`             | pass   | Started hidden process, `/healthz` returned expected JSON, then stopped process `8276`.                                             |
-| worker smoke    | `pnpm dev:worker`                                                   | pass   | Started hidden process, readiness log appeared, then stopped process `22932`.                                                       |
-| git status      | `git status --short`                                                | pass   | Shows intended Phase 4 modified/untracked files only.                                                                               |
+| Gate            | Command                                             | Status | Evidence / notes                                                                                   |
+| --------------- | --------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------- |
+| Docker services | `docker compose -f .\infra\docker-compose.yml ps`   | pass   | `webhook-monitor-postgres` and `webhook-monitor-redis` are `Up` and `healthy`.                     |
+| diff whitespace | `git diff --check`                                  | pass   | Exit code 0; Git reported only LF-to-CRLF working-copy warnings for `README.md` and `STATE.md`.    |
+| format          | `pnpm format:check`                                 | pass   | `All matched files use Prettier code style!`.                                                      |
+| lint            | `pnpm lint`                                         | pass   | `eslint .` completed with exit code 0.                                                             |
+| typecheck       | `pnpm typecheck`                                    | pass   | `tsc -b --pretty false` completed with exit code 0.                                                |
+| tests           | `pnpm test -- --run`                                | pass   | Vitest: 14 test files and 72 tests passed.                                                         |
+| build           | `pnpm -r --if-present build`                        | pass   | Exit code 0; pnpm reported `Scope: 6 of 7 workspace projects` with no package build-script output. |
+| docs format fix | `pnpm exec prettier --write .\README.md .\STATE.md` | pass   | Targeted Prettier write touched only docs; `README.md` was unchanged and `STATE.md` was formatted. |
+| git status      | `git status --short`                                | pass   | Final expected working tree: `README.md` and `STATE.md` modified only.                             |
 
-### Phase 4 optional / skipped gates
+### Phase 4 automated checks
 
-| Gate                    | Status  | Reason                                                                                              | Follow-up                             |
-| ----------------------- | ------- | --------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| manual webhook QA       | skipped | Automated API/worker/queue tests and smoke checks passed; manual examples are documented in README. | Use README Phase 4 examples manually. |
-| dashboard/manual replay | n/a     | Explicitly out of scope for Phase 4.                                                                | Revisit in later phases.              |
-| real provider APIs      | n/a     | Explicitly out of scope; mock-only behavior.                                                        | Requires explicit approval.           |
+| Gate            | Command              | Status | Evidence / notes                                                                                                                    |
+| --------------- | -------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| install         | `pnpm install`       | pass   | Lockfile was up to date after dependency additions; pnpm `v11.7.0`.                                                                 |
+| migration gen   | `pnpm db:generate`   | pass   | Drizzle reported no schema changes and nothing to migrate.                                                                          |
+| migration apply | `pnpm db:migrate`    | pass   | Existing Drizzle schema/migration tables detected; migrations applied successfully.                                                 |
+| tests           | `pnpm test -- --run` | pass   | Final Vitest run: 14 test files and 72 tests passed. Initial run exposed BullMQ job-id and test-ordering issues, then rerun passed. |
+| format          | `pnpm format:check`  | pass   | Final run: `All matched files use Prettier code style!`; first run identified 9 files and targeted formatting fixed them.           |
+| lint            | `pnpm lint`          | pass   | `eslint .` completed with exit code 0.                                                                                              |
+| typecheck       | `pnpm typecheck`     | pass   | Final `tsc -b --pretty false` completed with exit code 0 after fixing BullMQ/ioredis type boundaries.                               |
+| git status      | `git status --short` | pass   | Shows intended Phase 4 modified/untracked files only.                                                                               |
+
+### Phase 4 boot smoke checks
+
+| Gate            | Command                                                             | Status | Evidence / notes                                                                        |
+| --------------- | ------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------- |
+| Docker services | `docker compose -f .\infra\docker-compose.yml up -d postgres redis` | pass   | `webhook-monitor-postgres` and `webhook-monitor-redis` were already running.            |
+| dev API smoke   | `pnpm dev:api` plus `GET http://localhost:3000/healthz`             | pass   | Started hidden process, `/healthz` returned expected JSON, then stopped process `8276`. |
+| worker smoke    | `pnpm dev:worker`                                                   | pass   | Started hidden process, readiness log appeared, then stopped process `22932`.           |
+
+### Phase 4 manual E2E webhook QA
+
+| Check                         | Status  | Evidence / notes                                                                                                                                                                                                                                                                                                                                                                                                          | Follow-up                                                                                                    |
+| ----------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| success webhook               | pass    | Provided local API/worker manual QA evidence for `generic-phase4-success-1`: `current_status=delivered`, `last_successful_at` present; delivery attempt 1 `succeeded` with HTTP `200`; status history followed `received -> validated -> queued -> processing -> delivered`.                                                                                                                                              | Keep README SQL available for repeat manual verification.                                                    |
+| retry-then-success webhook    | pass    | Provided local API/worker manual QA evidence for `generic-phase4-retry-1`: `current_status=delivered`, `last_successful_at` present; attempt 1 `failed_retryable` with HTTP `503` and `error_code=MOCK_DOWNSTREAM_RETRYABLE`; attempt 2 `succeeded` with HTTP `200`; status history followed `received -> validated -> queued -> processing -> retry_scheduled -> processing -> delivered`.                               | Keep README SQL available for repeat manual verification.                                                    |
+| permanent-failure dead letter | pass    | Provided local API/worker manual QA evidence for `generic-phase4-dead-letter-1`: `current_status=dead_lettered`, `last_successful_at` null; attempt 1 `failed_permanent` with HTTP `400` and `error_code=MOCK_DOWNSTREAM_PERMANENT`; status history followed `received -> validated -> queued -> processing -> dead_lettered`; dead-letter row has `reason_code=permanent_delivery_failure` and `final_attempt_number=1`. | Keep README SQL available for repeat manual verification.                                                    |
+| retry-exhaustion dead letter  | skipped | Optional variant was not run because retry exhaustion was not included in the provided Phase 4 manual QA evidence.                                                                                                                                                                                                                                                                                                        | Run README retry-exhaustion variant manually in a later QA pass if desired.                                  |
+| DB record inspection          | pass    | Provided SQL inspection evidence covered `webhook_events`, `delivery_attempts`, `event_status_history`, and `dead_letter_events` for the three manual QA event IDs. `tools/simulator` currently contains only a package manifest, and there is no dedicated simulator CLI or fully automated manual-QA helper yet.                                                                                                        | Use README SQL or interactive `pnpm db:studio` inspection for future manual QA; `db:studio` is non-blocking. |
+
+### Phase 4 skipped / out-of-scope checks
+
+| Gate                                  | Status  | Reason                                                                                                                    | Follow-up                                       |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| retry-exhaustion variant              | skipped | Optional scenario was not run because it was not included in the provided Phase 4 manual QA evidence.                     | Revisit only if a later QA pass needs it.       |
+| `pnpm db:studio`                      | skipped | Script is available for interactive inspection, but it is not a blocking validation command because it is long-running.   | Use manually for table inspection if useful.    |
+| graceful shutdown manual verification | skipped | No explicit Phase 4.2 manual QA evidence was provided for graceful shutdown; do not record it as manually verified.       | Verify separately if it becomes a release gate. |
+| dedicated simulator/manual-QA helper  | n/a     | No dedicated simulator CLI or fully automated manual-QA helper exists yet; `tools/simulator` has only a package manifest. | Revisit in a simulator phase.                   |
+| dashboard/manual replay               | n/a     | Explicitly out of scope for Phase 4.                                                                                      | Revisit in later phases.                        |
+| GitHub Actions                        | n/a     | Explicitly out of scope; local validation remains the default.                                                            | Add only in a later approved phase.             |
+| real provider APIs                    | n/a     | Explicitly out of scope; mock-only behavior and fake local values only.                                                   | Requires explicit approval.                     |
 
 ### Phase 3 required gates
 

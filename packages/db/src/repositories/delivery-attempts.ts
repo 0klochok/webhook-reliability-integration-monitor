@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import type { Database } from "../client.js";
 import { deliveryAttempts, type DeliveryAttempt, type DeliveryAttemptStatus } from "../schema.js";
@@ -30,6 +30,11 @@ export interface UpdateDeliveryAttemptResultInput {
   readonly completedAt?: Date | null;
 }
 
+export interface CreateOrGetDeliveryAttemptResult {
+  readonly inserted: boolean;
+  readonly attempt: DeliveryAttempt;
+}
+
 export const createDeliveryAttemptsRepository = (db: Database) => ({
   createDeliveryAttempt: async (input: CreateDeliveryAttemptInput): Promise<DeliveryAttempt> => {
     const [attempt] = await db
@@ -55,6 +60,58 @@ export const createDeliveryAttemptsRepository = (db: Database) => ({
     }
 
     return attempt;
+  },
+
+  createOrGetDeliveryAttempt: async (
+    input: CreateDeliveryAttemptInput
+  ): Promise<CreateOrGetDeliveryAttemptResult> => {
+    const [insertedAttempt] = await db
+      .insert(deliveryAttempts)
+      .values({
+        eventId: input.eventId,
+        attemptNumber: input.attemptNumber,
+        status: input.status ?? "pending",
+        targetUrl: input.targetUrl ?? null,
+        httpStatusCode: input.httpStatusCode ?? null,
+        errorCode: input.errorCode ?? null,
+        errorMessage: input.errorMessage ?? null,
+        durationMs: input.durationMs ?? null,
+        nextRetryAt: input.nextRetryAt ?? null,
+        startedAt: input.startedAt ?? null,
+        completedAt: input.completedAt ?? null,
+        createdAt: input.createdAt ?? new Date()
+      })
+      .onConflictDoNothing({
+        target: [deliveryAttempts.eventId, deliveryAttempts.attemptNumber]
+      })
+      .returning();
+
+    if (insertedAttempt) {
+      return {
+        inserted: true,
+        attempt: insertedAttempt
+      };
+    }
+
+    const [existingAttempt] = await db
+      .select()
+      .from(deliveryAttempts)
+      .where(
+        and(
+          eq(deliveryAttempts.eventId, input.eventId),
+          eq(deliveryAttempts.attemptNumber, input.attemptNumber)
+        )
+      )
+      .limit(1);
+
+    if (!existingAttempt) {
+      throw new Error("Delivery attempt conflict occurred but no existing attempt was found.");
+    }
+
+    return {
+      inserted: false,
+      attempt: existingAttempt
+    };
   },
 
   updateDeliveryAttemptResult: async (

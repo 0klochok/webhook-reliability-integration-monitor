@@ -247,6 +247,29 @@ describe("delivery attempts", () => {
     expect(await attempts.listAttemptsForEvent(event.id)).toHaveLength(2);
     expect(await attempts.getLatestAttemptForEvent(event.id)).toEqual(latest);
   });
+
+  it("idempotently returns an existing attempt for the same event and attempt number", async () => {
+    const event = await createPersistedEvent("evt_attempts_idempotent");
+    const attempts = createDeliveryAttemptsRepository(client.db);
+
+    const created = await attempts.createOrGetDeliveryAttempt({
+      eventId: event.id,
+      attemptNumber: 1,
+      status: "running",
+      startedAt: new Date("2026-06-20T12:03:00.000Z")
+    });
+    const repeated = await attempts.createOrGetDeliveryAttempt({
+      eventId: event.id,
+      attemptNumber: 1,
+      status: "running",
+      startedAt: new Date("2026-06-20T12:03:01.000Z")
+    });
+
+    expect(created.inserted).toBe(true);
+    expect(repeated.inserted).toBe(false);
+    expect(repeated.attempt.id).toBe(created.attempt.id);
+    expect(await attempts.listAttemptsForEvent(event.id)).toHaveLength(1);
+  });
 });
 
 describe("dead-letter events", () => {
@@ -274,6 +297,34 @@ describe("dead-letter events", () => {
 
     expect(await repository.getDeadLetterByEventId(event.id)).toEqual(deadLetter);
     expect(await repository.listDeadLetterEvents()).toContainEqual(deadLetter);
+  });
+
+  it("idempotently returns an existing dead-letter record for the same event", async () => {
+    const event = await createPersistedEvent("evt_dead_letter_idempotent");
+    const repository = createDeadLetterEventsRepository(client.db);
+
+    const created = await repository.createOrGetDeadLetterEvent({
+      eventId: event.id,
+      reasonCode: "max_attempts_exhausted",
+      errorMessage: "Fake downstream failure.",
+      finalAttemptNumber: 3,
+      payloadSnapshot: event.payload,
+      deadLetteredAt: new Date("2026-06-20T12:04:00.000Z"),
+      createdAt: new Date("2026-06-20T12:04:00.000Z")
+    });
+    const repeated = await repository.createOrGetDeadLetterEvent({
+      eventId: event.id,
+      reasonCode: "permanent_failure",
+      errorMessage: "Duplicate dead-letter write.",
+      finalAttemptNumber: 1,
+      deadLetteredAt: new Date("2026-06-20T12:05:00.000Z"),
+      createdAt: new Date("2026-06-20T12:05:00.000Z")
+    });
+
+    expect(created.inserted).toBe(true);
+    expect(repeated.inserted).toBe(false);
+    expect(repeated.deadLetterEvent.id).toBe(created.deadLetterEvent.id);
+    expect(await repository.listDeadLetterEvents()).toHaveLength(1);
   });
 });
 

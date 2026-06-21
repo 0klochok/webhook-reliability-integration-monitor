@@ -29,7 +29,7 @@ export const createRecordingDeliveryQueue = (): RecordingDeliveryQueue => {
 
   return {
     calls,
-    failNext(error = new Error("Queue placeholder failed.")) {
+    failNext(error = new Error("Recording delivery queue failed.")) {
       nextError = error;
     },
     enqueueDelivery: async (input) => {
@@ -43,7 +43,7 @@ export const createRecordingDeliveryQueue = (): RecordingDeliveryQueue => {
 
       return {
         queued: true,
-        queueJobId: `placeholder:${input.eventId}`
+        queueJobId: `delivery-${input.eventId}`
       };
     }
   };

@@ -110,7 +110,7 @@ afterAll(async () => {
   await client.close();
 });
 
-describe("Phase 3 webhook ingress API", () => {
+describe("webhook ingress API", () => {
   it("returns a minimal health response", async () => {
     const { app } = createApiTestHarness({ client });
 
@@ -124,7 +124,7 @@ describe("Phase 3 webhook ingress API", () => {
     });
   });
 
-  it("accepts a valid generic HTTP webhook, persists it, and calls the queue placeholder once", async () => {
+  it("accepts a valid generic HTTP webhook, persists it, and enqueues delivery once", async () => {
     const { app, deliveryQueue, webhookEvents } = createApiTestHarness({
       client,
       clock: () => fixedNow
@@ -143,7 +143,12 @@ describe("Phase 3 webhook ingress API", () => {
       duplicate: false
     });
     expect(deliveryQueue.calls).toHaveLength(1);
-    expect(deliveryQueue.calls[0]).toEqual({ eventId: body.eventId });
+    expect(deliveryQueue.calls[0]).toMatchObject({
+      eventId: body.eventId,
+      providerId: "generic-http",
+      externalEventId: payload.eventId,
+      enqueuedAt: new Date(fixedNow.getTime() + 2).toISOString()
+    });
 
     const event = await webhookEvents.getById(body.eventId);
     const history = await webhookEvents.listStatusHistory(body.eventId);
@@ -153,7 +158,7 @@ describe("Phase 3 webhook ingress API", () => {
     expect(history.map((entry) => entry.toStatus)).toEqual(["received", "validated", "queued"]);
   });
 
-  it("accepts a valid mock CRM webhook and calls the queue placeholder once", async () => {
+  it("accepts a valid mock CRM webhook and enqueues delivery once", async () => {
     const { app, deliveryQueue, webhookEvents } = createApiTestHarness({
       client,
       clock: () => fixedNow

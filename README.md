@@ -24,6 +24,13 @@ calls a dependency-injected delivery queue placeholder only for newly accepted e
 not add BullMQ, Redis queue behavior, worker processing, retry execution, dashboard pages,
 simulator commands, real provider APIs, or provider SDKs.
 
+Phase 4 replaces the queue placeholder with BullMQ-backed delivery jobs in `packages/queue` and
+adds `apps/worker` for local mock downstream processing. The worker records delivery attempts,
+updates event status history, retries retryable failures with capped exponential backoff, marks
+successful events as delivered, and creates dead-letter records after retry exhaustion or permanent
+mock failures. Phase 4 still does not add dashboard pages, manual replay UI, simulator commands,
+provider SDKs, real provider calls, paid API usage, GitHub Actions, or app containers.
+
 ## Problem Statement
 
 Business automations often depend on webhooks from payment providers, CRMs, scheduling tools, and
@@ -219,6 +226,118 @@ docker compose -f .\infra\docker-compose.yml up -d postgres redis
 pnpm install
 pnpm db:migrate
 pnpm test -- --run
+pnpm lint
+pnpm typecheck
+git status --short
+```
+
+## Phase 4 Queue, Worker, Retry, And Dead Letter
+
+Phase 4 requires local PostgreSQL and Redis. `packages/queue` owns the BullMQ queue named
+`webhook-delivery`, delivery job validation, stable job ids in the form `delivery-<eventId>`, Redis
+connection helpers, and capped exponential retry options. `apps/api` enqueues one delivery job for
+each newly accepted webhook event; duplicate events and rejected webhooks do not enqueue jobs.
+
+`apps/worker` consumes delivery jobs and calls a deterministic local mock downstream client. The
+mock behavior is controlled by `generic-http` payload fields such as
+`payload.deliveryBehavior`. Supported values are `success`, `fail-once-then-success`,
+`fail-twice-then-success`, `always-retryable-fail`, and `permanent-fail`.
+
+Start the local infrastructure, migrate the database, and run the API:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
+pnpm install
+pnpm db:migrate
+pnpm dev:api
+```
+
+`pnpm dev:api` is long-running. In a second PowerShell terminal, start the worker:
+
+```powershell
+pnpm dev:worker
+```
+
+`pnpm dev:worker` is also long-running. In a third PowerShell terminal, send a successful delivery
+scenario:
+
+```powershell
+$successBody = @{
+  eventId = "generic-phase4-success-1"
+  eventType = "order.fulfilled"
+  occurredAt = "2026-06-20T12:00:00.000Z"
+  source = "manual-local"
+  idempotencyKey = "generic-phase4-success-1"
+  payload = @{
+    orderId = "order_phase4_success_123"
+    deliveryBehavior = "success"
+  }
+} | ConvertTo-Json -Depth 6 -Compress
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:3000/webhooks/generic-http" `
+  -ContentType "application/json" `
+  -Body $successBody
+```
+
+Send a retry-then-success scenario:
+
+```powershell
+$retryBody = @{
+  eventId = "generic-phase4-retry-1"
+  eventType = "order.fulfilled"
+  occurredAt = "2026-06-20T12:00:00.000Z"
+  source = "manual-local"
+  idempotencyKey = "generic-phase4-retry-1"
+  payload = @{
+    orderId = "order_phase4_retry_123"
+    deliveryBehavior = "fail-once-then-success"
+  }
+} | ConvertTo-Json -Depth 6 -Compress
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:3000/webhooks/generic-http" `
+  -ContentType "application/json" `
+  -Body $retryBody
+```
+
+Send a dead-letter scenario:
+
+```powershell
+$deadLetterBody = @{
+  eventId = "generic-phase4-dead-letter-1"
+  eventType = "order.fulfilled"
+  occurredAt = "2026-06-20T12:00:00.000Z"
+  source = "manual-local"
+  idempotencyKey = "generic-phase4-dead-letter-1"
+  payload = @{
+    orderId = "order_phase4_dead_letter_123"
+    deliveryBehavior = "always-retryable-fail"
+  }
+} | ConvertTo-Json -Depth 6 -Compress
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:3000/webhooks/generic-http" `
+  -ContentType "application/json" `
+  -Body $deadLetterBody
+```
+
+Use `pnpm db:studio` or SQL inspection manually if you want to inspect `delivery_attempts`,
+`event_status_history`, and `dead_letter_events`. The worker handles `SIGINT` and `SIGTERM` by
+closing the BullMQ worker, Redis connection, and database client.
+
+Phase 4 validation commands:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
+pnpm install
+pnpm db:generate
+pnpm db:migrate
+pnpm test -- --run
+pnpm format:check
 pnpm lint
 pnpm typecheck
 git status --short

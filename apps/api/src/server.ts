@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { createDatabaseClient, createWebhookEventRepository } from "@webhook-monitor/db";
-import { createNoopDeliveryQueue } from "@webhook-monitor/queue";
+import { createBullMqDeliveryQueue } from "@webhook-monitor/queue";
 
 import { createApp } from "./app.js";
 import { loadApiConfig, loadLocalApiEnv } from "./config.js";
@@ -11,10 +11,11 @@ const config = loadApiConfig();
 const database = createDatabaseClient({
   allowExampleFallback: true
 });
+const deliveryQueue = createBullMqDeliveryQueue();
 const app = createApp({
   config,
   webhookEvents: createWebhookEventRepository(database.db),
-  deliveryQueue: createNoopDeliveryQueue()
+  deliveryQueue
 });
 
 const server = serve(
@@ -39,8 +40,7 @@ const shutdown = (signal: NodeJS.Signals): void => {
   console.log(`Received ${signal}; shutting down webhook-reliability-api.`);
 
   server.close(() => {
-    database
-      .close()
+    Promise.all([database.close(), deliveryQueue.close()])
       .then(() => {
         process.exit(0);
       })

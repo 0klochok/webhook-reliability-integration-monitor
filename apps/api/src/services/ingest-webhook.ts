@@ -8,7 +8,7 @@ import {
   type ProviderId
 } from "@webhook-monitor/core";
 import type { createWebhookEventRepository } from "@webhook-monitor/db";
-import type { DeliveryQueuePort } from "@webhook-monitor/queue";
+import { webhookDeliveryQueueName, type DeliveryQueuePort } from "@webhook-monitor/queue";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import type { ApiConfig } from "../config.js";
@@ -386,9 +386,15 @@ const persistAcceptedEvent = async (
     });
   }
 
+  let enqueueResult: Awaited<ReturnType<DeliveryQueuePort["enqueueDelivery"]>>;
+  const queuedAt = addMilliseconds(input.receivedAt, 2);
+
   try {
-    await dependencies.deliveryQueue.enqueueDelivery({
-      eventId: createResult.event.id
+    enqueueResult = await dependencies.deliveryQueue.enqueueDelivery({
+      eventId: createResult.event.id,
+      providerId: input.normalizedEvent.providerId,
+      externalEventId: input.normalizedEvent.externalEventId,
+      enqueuedAt: queuedAt.toISOString()
     });
   } catch (cause) {
     throw new ApiError({
@@ -404,12 +410,13 @@ const persistAcceptedEvent = async (
     await dependencies.webhookEvents.transitionStatus({
       eventId: createResult.event.id,
       toStatus: "queued",
-      reasonCode: "delivery_enqueue_placeholder",
-      message: "Webhook event was accepted by the delivery queue placeholder.",
+      reasonCode: "delivery_enqueued",
+      message: "Webhook event was accepted by the delivery queue.",
       metadata: {
-        queue: "placeholder"
+        queue: webhookDeliveryQueueName,
+        queueJobId: enqueueResult.queueJobId
       },
-      changedAt: addMilliseconds(input.receivedAt, 2)
+      changedAt: queuedAt
     });
   } catch (cause) {
     throw new ApiError({

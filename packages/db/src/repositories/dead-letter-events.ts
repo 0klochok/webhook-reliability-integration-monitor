@@ -14,6 +14,11 @@ export interface CreateDeadLetterEventInput {
   readonly createdAt?: Date;
 }
 
+export interface CreateOrGetDeadLetterEventResult {
+  readonly inserted: boolean;
+  readonly deadLetterEvent: DeadLetterEvent;
+}
+
 export const createDeadLetterEventsRepository = (db: Database) => ({
   createDeadLetterEvent: async (input: CreateDeadLetterEventInput): Promise<DeadLetterEvent> => {
     const now = input.createdAt ?? new Date();
@@ -35,6 +40,49 @@ export const createDeadLetterEventsRepository = (db: Database) => ({
     }
 
     return deadLetterEvent;
+  },
+
+  createOrGetDeadLetterEvent: async (
+    input: CreateDeadLetterEventInput
+  ): Promise<CreateOrGetDeadLetterEventResult> => {
+    const now = input.createdAt ?? new Date();
+    const [insertedDeadLetterEvent] = await db
+      .insert(deadLetterEvents)
+      .values({
+        eventId: input.eventId,
+        reasonCode: input.reasonCode,
+        errorMessage: input.errorMessage ?? null,
+        finalAttemptNumber: input.finalAttemptNumber ?? null,
+        payloadSnapshot: input.payloadSnapshot ?? null,
+        deadLetteredAt: input.deadLetteredAt ?? now,
+        createdAt: now
+      })
+      .onConflictDoNothing({
+        target: deadLetterEvents.eventId
+      })
+      .returning();
+
+    if (insertedDeadLetterEvent) {
+      return {
+        inserted: true,
+        deadLetterEvent: insertedDeadLetterEvent
+      };
+    }
+
+    const [existingDeadLetterEvent] = await db
+      .select()
+      .from(deadLetterEvents)
+      .where(eq(deadLetterEvents.eventId, input.eventId))
+      .limit(1);
+
+    if (!existingDeadLetterEvent) {
+      throw new Error("Dead-letter conflict occurred but no existing event was found.");
+    }
+
+    return {
+      inserted: false,
+      deadLetterEvent: existingDeadLetterEvent
+    };
   },
 
   getDeadLetterByEventId: async (eventId: string): Promise<DeadLetterEvent | undefined> => {

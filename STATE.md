@@ -9,7 +9,7 @@
 - Contributors: Codex
 - Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
 - Current branch: `main`
-- Current phase: Phase 3 — Webhook ingress API complete
+- Current phase: Phase 4 — Queue, worker, retry, and dead-letter behavior complete
 - Overall status: green
 - Quality gate status: green
 - Completion: 100%
@@ -25,19 +25,19 @@
 
 ## 1. Current objective
 
-- Phase objective: Add local Hono webhook ingress for `POST /webhooks/:provider` with raw-body signature verification, Zod validation, idempotent persistence, rejected-event audit history, and a queue placeholder.
+- Phase objective: Replace the Phase 3 queue placeholder with BullMQ/Redis delivery jobs and add a local worker that records delivery attempts, retries mock downstream failures, and dead-letters exhausted/permanent failures.
 - Deadline / target date: none
-- Definition of done: `apps/api` exposes `GET /healthz` and `POST /webhooks/:provider`; accepted, duplicate, invalid-signature, invalid-JSON, invalid-payload, and unsupported-provider paths are tested through Hono `app.request()` and local PostgreSQL; no BullMQ, Redis queue behavior, worker, retry execution, dashboard, simulator, or real provider API behavior is introduced.
-- Primary user-visible signal: `pnpm dev:api` boots the local API and `/healthz` returns JSON `{ ok: true, service: "webhook-reliability-api" }`.
-- Secondary checks: `pnpm install`, `pnpm db:migrate`, `pnpm test -- --run`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, Docker Compose Postgres/Redis start, and `git status --short`.
-- Out of scope: BullMQ/Redis queue implementation, worker processing, downstream delivery, retry execution, dashboard pages, simulator commands, GitHub Actions, commits, pushes, tags, and real provider APIs.
+- Definition of done: valid newly inserted webhooks enqueue one BullMQ delivery job; the worker consumes jobs, records `delivery_attempts`, transitions event status/history, retries retryable mock failures with capped exponential backoff, marks success as `delivered`, and creates `dead_letter_events` for exhausted/permanent failures.
+- Primary user-visible signal: `pnpm dev:api` and `pnpm dev:worker` boot locally with Postgres/Redis running; a `generic-http` payload with `payload.deliveryBehavior` drives success, retry-success, and dead-letter demo behavior.
+- Secondary checks: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`, `pnpm install`, `pnpm db:generate`, `pnpm db:migrate`, `pnpm test -- --run`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, long-running command smoke checks, and `git status --short`.
+- Out of scope: dashboard pages, manual replay UI, simulator commands, GitHub Actions, commits, pushes, tags, app containers, provider SDKs, real provider APIs, and paid API usage.
 
 ## 2. Status snapshot
 
-- Summary: Phase 3 webhook ingress is implemented and locally validated. The project now has a Hono API, raw-body Stripe-style sample verification, provider validation/normalization, idempotent database persistence, rejected-event audit history, and a dependency-injected queue placeholder. It still has no BullMQ/Redis queue implementation, worker, retry execution, dashboard, simulator behavior, or real provider integration behavior.
-- Since last update: Added `@webhook-monitor/api`, queue placeholder contracts in `@webhook-monitor/queue`, a small idempotent-with-history repository helper in `@webhook-monitor/db`, API integration tests, README manual checks, local validation against Docker PostgreSQL, and a Phase 3 manual ingress QA record.
-- Current focus: Ready for user review and manual commit, then Phase 4 queue/worker planning.
-- Main uncertainty: none for Phase 3.
+- Summary: Phase 4 queue/worker behavior is implemented and locally validated. The API now uses the real BullMQ delivery queue at runtime, while tests still inject fakes. The worker processes fake/local downstream delivery, persists attempts/history/dead-letter records, and shuts down cleanly.
+- Since last update: Added BullMQ/ioredis queue implementation, worker runtime, mock downstream behavior, idempotent DB helpers, Phase 4 tests, worker scripts, `.env.example` worker/retry values, and README manual verification notes.
+- Current focus: Ready for user review and manual commit, then Phase 5 planning.
+- Main uncertainty: none for Phase 4.
 
 ## 3. Completed phases / milestones
 
@@ -47,6 +47,7 @@
 | Phase 1 — Domain contracts | 2026-06-20 | Core provider contracts, schemas, adapters, retry policy, statuses, and fake/local signature verifier. | green        | none        |
 | Phase 2 — Persistence      | 2026-06-20 | PostgreSQL persistence, Drizzle migrations, db repositories, local reset/seed, and integration tests.  | green        | none        |
 | Phase 3 — Ingress API      | 2026-06-20 | Hono webhook ingress, raw-body signatures, validation, idempotency, audit history, and queue port.     | green        | none        |
+| Phase 4 — Queue / worker   | 2026-06-21 | BullMQ queue, worker processing, retries, delivery attempts, and dead-letter behavior.                 | green        | none        |
 
 ## 4. Completed since last update
 
@@ -61,40 +62,71 @@
 - 2026-06-20: Implemented Phase 3 webhook ingress — evidence: `apps/api/src`, `apps/api/test`, `packages/queue/src`, `packages/db/src/repositories/webhook-events.ts`, root/API scripts, `.env.example`, and `pnpm-lock.yaml`.
 - 2026-06-20: Validated Phase 3 locally — evidence: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`, `pnpm install`, `pnpm db:migrate`, `pnpm test -- --run`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, and `pnpm dev:api` health smoke passed.
 - 2026-06-21: Recorded Phase 3 manual webhook ingress QA as passed — evidence: `/healthz` OK, `generic-http` fresh/duplicate/invalid-payload paths, unsupported-provider 404, `stripe-sample` local missing-secret and bad-signature paths, and final `pnpm test` pass after Docker PostgreSQL/Redis were started.
+- 2026-06-21: Implemented and validated Phase 4 queue/worker behavior — evidence: `packages/queue/src`, `packages/queue/test`, `apps/worker/src`, `apps/worker/test`, API BullMQ runtime wiring, DB idempotency helpers, README/env updates, and required validation gates passing.
 
 ## 5. Changed files
 
-| Path                                                              | Purpose                              | Status  | Notes                                                                                              |
-| ----------------------------------------------------------------- | ------------------------------------ | ------- | -------------------------------------------------------------------------------------------------- |
-| `package.json`, `pnpm-workspace.yaml`                             | Root pnpm workspace and scripts      | created | No runtime app dependencies added.                                                                 |
-| `tsconfig.base.json`, `tsconfig.json`                             | TypeScript baseline                  | created | ESM-oriented Node TypeScript config.                                                               |
-| `eslint.config.js`, `.prettierrc.json`                            | Lint and format tooling              | created | ESLint flat config and Prettier config.                                                            |
-| `.gitignore`, `.editorconfig`, `.env.example`                     | Local repository defaults            | created | `.env.example` contains fake values only.                                                          |
-| `apps/*`, `packages/*`, `tools/simulator`                         | Future workspace package directories | created | Package manifests only; no source code.                                                            |
-| `infra/docker-compose.yml`                                        | Local PostgreSQL and Redis services  | created | Named volumes and health checks.                                                                   |
-| `README.md`, `CONTEXT.md`, `RUNBOOK.md`                           | Setup and workflow documentation     | updated | Phase 0 commands and constraints.                                                                  |
-| `REQ.md`, `DESIGN.md`, `TDD.md`, `STATE.md`                       | Existing templates                   | updated | Formatted by Prettier.                                                                             |
-| `packages/core/src`                                               | Core domain contracts                | created | Pure TypeScript only; no ingress, DB, queue, or provider SDK.                                      |
-| `packages/core/test`                                              | Core unit tests                      | created | Covers provider IDs, statuses, schemas, retry policy, adapters, and fake signature verification.   |
-| `packages/core/package.json`, `pnpm-lock.yaml`                    | Core dependency metadata             | updated | Adds `zod` scoped to `@webhook-monitor/core`.                                                      |
-| `drizzle.config.ts`                                               | Drizzle Kit config                   | created | Used by db package scripts; reads `.env` or fake local `.env.example` values.                      |
-| `packages/db/src`                                                 | Persistence implementation           | created | Schema, client, migration runner, repositories, reset/seed helpers, and local safety checks.       |
-| `packages/db/drizzle`                                             | Generated migrations                 | created | Initial Drizzle migration and metadata for Phase 2 tables/enums/indexes.                           |
-| `packages/db/test`                                                | DB integration tests                 | created | Covers migrations, repositories, idempotency, history, attempts, dead letters, replays, safety.    |
-| `packages/db/package.json`, `pnpm-lock.yaml`                      | DB dependencies and scripts          | updated | Adds Drizzle, postgres.js, dotenv, drizzle-kit, tsx, and `@webhook-monitor/core`.                  |
-| `.env.example`, `README.md`                                       | Local env/docs                       | updated | Adds `POSTGRES_PORT` and Phase 2 local database instructions.                                      |
-| `apps/api/src`                                                    | Hono API implementation              | created | App factory, server, config, routes, ingest service, rejection handling, and test harness.         |
-| `apps/api/test`                                                   | API integration tests                | created | Covers health, valid providers, signatures, invalid inputs, idempotency, and unsupported provider. |
-| `packages/queue/src`                                              | Queue placeholder port               | created | Dependency-free `DeliveryQueuePort` and no-op implementation; no BullMQ or Redis behavior.         |
-| `packages/db/src/repositories/webhook-events.ts`                  | Phase 3 persistence helper           | updated | Adds idempotent create with initial status history for API ingress.                                |
-| `package.json`, `apps/api/package.json`                           | API scripts and dependencies         | updated | Adds `dev:api`, API package scripts, Hono, node-server adapter, workspace deps, and `tsx`.         |
-| `.env.example`, `README.md`, `STATE.md`                           | Phase 3 local docs/status            | updated | Adds API port/host, fake Stripe sample secret, manual API examples, and validation state.          |
-| `packages/db/package.json`, `packages/db/src/test-utils/index.ts` | DB test utility export               | updated | Exposes Phase 2 database test helpers for API integration tests.                                   |
-| `vitest.config.ts`                                                | Test runner stability                | updated | Disables file parallelism to prevent shared local DB cleanup races.                                |
+| Path                                                              | Purpose                              | Status  | Notes                                                                                                            |
+| ----------------------------------------------------------------- | ------------------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `package.json`, `pnpm-workspace.yaml`                             | Root pnpm workspace and scripts      | created | No runtime app dependencies added.                                                                               |
+| `tsconfig.base.json`, `tsconfig.json`                             | TypeScript baseline                  | created | ESM-oriented Node TypeScript config.                                                                             |
+| `eslint.config.js`, `.prettierrc.json`                            | Lint and format tooling              | created | ESLint flat config and Prettier config.                                                                          |
+| `.gitignore`, `.editorconfig`, `.env.example`                     | Local repository defaults            | created | `.env.example` contains fake values only.                                                                        |
+| `apps/*`, `packages/*`, `tools/simulator`                         | Future workspace package directories | created | Package manifests only; no source code.                                                                          |
+| `infra/docker-compose.yml`                                        | Local PostgreSQL and Redis services  | created | Named volumes and health checks.                                                                                 |
+| `README.md`, `CONTEXT.md`, `RUNBOOK.md`                           | Setup and workflow documentation     | updated | Phase 0 commands and constraints.                                                                                |
+| `REQ.md`, `DESIGN.md`, `TDD.md`, `STATE.md`                       | Existing templates                   | updated | Formatted by Prettier.                                                                                           |
+| `packages/core/src`                                               | Core domain contracts                | created | Pure TypeScript only; no ingress, DB, queue, or provider SDK.                                                    |
+| `packages/core/test`                                              | Core unit tests                      | created | Covers provider IDs, statuses, schemas, retry policy, adapters, and fake signature verification.                 |
+| `packages/core/package.json`, `pnpm-lock.yaml`                    | Core dependency metadata             | updated | Adds `zod` scoped to `@webhook-monitor/core`.                                                                    |
+| `drizzle.config.ts`                                               | Drizzle Kit config                   | created | Used by db package scripts; reads `.env` or fake local `.env.example` values.                                    |
+| `packages/db/src`                                                 | Persistence implementation           | created | Schema, client, migration runner, repositories, reset/seed helpers, and local safety checks.                     |
+| `packages/db/drizzle`                                             | Generated migrations                 | created | Initial Drizzle migration and metadata for Phase 2 tables/enums/indexes.                                         |
+| `packages/db/test`                                                | DB integration tests                 | created | Covers migrations, repositories, idempotency, history, attempts, dead letters, replays, safety.                  |
+| `packages/db/package.json`, `pnpm-lock.yaml`                      | DB dependencies and scripts          | updated | Adds Drizzle, postgres.js, dotenv, drizzle-kit, tsx, and `@webhook-monitor/core`.                                |
+| `.env.example`, `README.md`                                       | Local env/docs                       | updated | Adds `POSTGRES_PORT` and Phase 2 local database instructions.                                                    |
+| `apps/api/src`                                                    | Hono API implementation              | created | App factory, server, config, routes, ingest service, rejection handling, and test harness.                       |
+| `apps/api/test`                                                   | API integration tests                | created | Covers health, valid providers, signatures, invalid inputs, idempotency, and unsupported provider.               |
+| `packages/queue/src`                                              | Queue placeholder port               | created | Dependency-free `DeliveryQueuePort` and no-op implementation; no BullMQ or Redis behavior.                       |
+| `packages/db/src/repositories/webhook-events.ts`                  | Phase 3 persistence helper           | updated | Adds idempotent create with initial status history for API ingress.                                              |
+| `package.json`, `apps/api/package.json`                           | API scripts and dependencies         | updated | Adds `dev:api`, API package scripts, Hono, node-server adapter, workspace deps, and `tsx`.                       |
+| `.env.example`, `README.md`, `STATE.md`                           | Phase 3 local docs/status            | updated | Adds API port/host, fake Stripe sample secret, manual API examples, and validation state.                        |
+| `packages/db/package.json`, `packages/db/src/test-utils/index.ts` | DB test utility export               | updated | Exposes Phase 2 database test helpers for API integration tests.                                                 |
+| `vitest.config.ts`                                                | Test runner stability                | updated | Disables file parallelism to prevent shared local DB cleanup races.                                              |
+| `packages/queue/src`, `packages/queue/test`                       | BullMQ queue boundary                | updated | Adds delivery job contract, Redis helpers, stable job IDs, retry/backoff mapping, worker factory, and tests.     |
+| `apps/worker/src`, `apps/worker/test`, `apps/worker/package.json` | Worker runtime                       | created | Adds worker config, processor, mock downstream client, graceful shutdown, BullMQ integration tests, and scripts. |
+| `apps/api/src`, `apps/api/test`                                   | API queue wiring                     | updated | Runtime uses BullMQ queue; tests retain injectable fake queue and no-enqueue assertions.                         |
+| `packages/db/src/repositories`, `packages/db/test`                | Worker persistence helpers           | updated | Adds idempotent delivery-attempt and dead-letter helpers with tests; no schema migration needed.                 |
+| `.env.example`, `README.md`, `STATE.md`                           | Phase 4 local docs/status            | updated | Adds fake worker/retry/mock downstream values and manual Phase 4 verification instructions.                      |
+| `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`           | Phase 4 scripts/dependencies         | updated | Adds BullMQ/ioredis/zod queue dependencies, worker scripts, and explicit pnpm build policy.                      |
 
 ## 6. Validation and quality gates
 
 ### Required gates
+
+### Phase 4 required gates
+
+| Gate            | Command                                                             | Status | Evidence / notes                                                                                                                    |
+| --------------- | ------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Docker services | `docker compose -f .\infra\docker-compose.yml up -d postgres redis` | pass   | `webhook-monitor-postgres` and `webhook-monitor-redis` were already running.                                                        |
+| install         | `pnpm install`                                                      | pass   | Lockfile was up to date after dependency additions; pnpm `v11.7.0`.                                                                 |
+| migration gen   | `pnpm db:generate`                                                  | pass   | Drizzle reported no schema changes and nothing to migrate.                                                                          |
+| migration apply | `pnpm db:migrate`                                                   | pass   | Existing Drizzle schema/migration tables detected; migrations applied successfully.                                                 |
+| tests           | `pnpm test -- --run`                                                | pass   | Final Vitest run: 14 test files and 72 tests passed. Initial run exposed BullMQ job-id and test-ordering issues, then rerun passed. |
+| format          | `pnpm format:check`                                                 | pass   | Final run: `All matched files use Prettier code style!`; first run identified 9 files and targeted formatting fixed them.           |
+| lint            | `pnpm lint`                                                         | pass   | `eslint .` completed with exit code 0.                                                                                              |
+| typecheck       | `pnpm typecheck`                                                    | pass   | Final `tsc -b --pretty false` completed with exit code 0 after fixing BullMQ/ioredis type boundaries.                               |
+| dev API smoke   | `pnpm dev:api` plus `GET http://localhost:3000/healthz`             | pass   | Started hidden process, `/healthz` returned expected JSON, then stopped process `8276`.                                             |
+| worker smoke    | `pnpm dev:worker`                                                   | pass   | Started hidden process, readiness log appeared, then stopped process `22932`.                                                       |
+| git status      | `git status --short`                                                | pass   | Shows intended Phase 4 modified/untracked files only.                                                                               |
+
+### Phase 4 optional / skipped gates
+
+| Gate                    | Status  | Reason                                                                                              | Follow-up                             |
+| ----------------------- | ------- | --------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| manual webhook QA       | skipped | Automated API/worker/queue tests and smoke checks passed; manual examples are documented in README. | Use README Phase 4 examples manually. |
+| dashboard/manual replay | n/a     | Explicitly out of scope for Phase 4.                                                                | Revisit in later phases.              |
+| real provider APIs      | n/a     | Explicitly out of scope; mock-only behavior.                                                        | Requires explicit approval.           |
 
 ### Phase 3 required gates
 
@@ -201,10 +233,10 @@
 
 ## 7. Active tasks
 
-| ID       | Priority | Task                                                                | Owner      | Status | ETA  | Notes                                   |
-| -------- | -------- | ------------------------------------------------------------------- | ---------- | ------ | ---- | --------------------------------------- |
-| TASK-001 | P1       | Review Phase 3 validation result and commit manually when ready.    | User       | todo   | none | Do not commit or push from Codex.       |
-| TASK-002 | P1       | Plan Phase 4 queue/worker implementation after Phase 3 is accepted. | User/Codex | todo   | none | Keep BullMQ/Redis behavior phase-gated. |
+| ID       | Priority | Task                                                             | Owner      | Status | ETA  | Notes                                                     |
+| -------- | -------- | ---------------------------------------------------------------- | ---------- | ------ | ---- | --------------------------------------------------------- |
+| TASK-001 | P1       | Review Phase 4 validation result and commit manually when ready. | User       | todo   | none | Do not commit or push from Codex.                         |
+| TASK-002 | P2       | Plan next phase after Phase 4 is accepted.                       | User/Codex | todo   | none | Keep dashboard/simulator/manual replay scope phase-gated. |
 
 ## 8. Backlog / long horizon
 
@@ -216,7 +248,7 @@
 
 | ID        | Issue                             | Severity | Owner / layer | Next action | Target |
 | --------- | --------------------------------- | -------- | ------------- | ----------- | ------ |
-| ISSUE-001 | none currently known for Phase 3. | n/a      | n/a           | n/a         | n/a    |
+| ISSUE-001 | none currently known for Phase 4. | n/a      | n/a           | n/a         | n/a    |
 
 ## 10. Risks
 
@@ -227,13 +259,15 @@
 
 ## 11. Decisions since last update
 
-| ID      | Date       | Decision                                     | Rationale                                                               | Tradeoff / consequence                            |
-| ------- | ---------- | -------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------- |
-| DEC-001 | 2026-06-20 | Use pnpm workspace with local-only tooling.  | Matches requested stack and phase gating.                               | Runtime dependencies deferred to later phases.    |
-| DEC-002 | 2026-06-20 | Use Docker Compose for PostgreSQL and Redis. | Matches future architecture requirements.                               | Validation requires Docker Desktop to be running. |
-| DEC-003 | 2026-06-20 | Keep real provider APIs disabled by default. | Prevents paid/credentialed API use locally.                             | Later phases must use mocks unless approved.      |
-| DEC-004 | 2026-06-20 | Use Hono for Phase 3 ingress.                | Matches requested stack and keeps tests serverless via `app.request()`. | Dashboard/UI remains deferred.                    |
-| DEC-005 | 2026-06-20 | Keep queue as a placeholder port only.       | Preserves Phase 3 boundary and prepares Phase 4 replacement.            | No Redis/BullMQ behavior yet.                     |
+| ID      | Date       | Decision                                                              | Rationale                                                                                       | Tradeoff / consequence                                                 |
+| ------- | ---------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| DEC-001 | 2026-06-20 | Use pnpm workspace with local-only tooling.                           | Matches requested stack and phase gating.                                                       | Runtime dependencies deferred to later phases.                         |
+| DEC-002 | 2026-06-20 | Use Docker Compose for PostgreSQL and Redis.                          | Matches future architecture requirements.                                                       | Validation requires Docker Desktop to be running.                      |
+| DEC-003 | 2026-06-20 | Keep real provider APIs disabled by default.                          | Prevents paid/credentialed API use locally.                                                     | Later phases must use mocks unless approved.                           |
+| DEC-004 | 2026-06-20 | Use Hono for Phase 3 ingress.                                         | Matches requested stack and keeps tests serverless via `app.request()`.                         | Dashboard/UI remains deferred.                                         |
+| DEC-005 | 2026-06-20 | Keep queue as a placeholder port only.                                | Preserves Phase 3 boundary and prepares Phase 4 replacement.                                    | No Redis/BullMQ behavior yet.                                          |
+| DEC-006 | 2026-06-21 | Use BullMQ with stable job IDs and capped custom backoff for Phase 4. | Matches requested queue/worker stack and keeps retry policy configurable from local env.        | BullMQ rejects `:` in custom IDs, so job IDs use `delivery-<eventId>`. |
+| DEC-007 | 2026-06-21 | Keep downstream delivery payload-driven and local-only.               | Demonstrates success, retry, permanent failure, and dead-letter behavior without external APIs. | Real provider delivery remains deferred.                               |
 
 ## 12. Open questions
 
@@ -243,15 +277,15 @@
 
 ## 13. Next 3 actions
 
-1. User: Review Phase 3 validation summary — expected result: Phase 3 accepted as complete.
-2. User: Commit manually when ready — expected result: Phase 3 ingress captured in Git history.
-3. User/Codex: Plan Phase 4 queue/worker implementation — expected result: BullMQ/Redis behavior begins without dashboard/simulator scope creep.
+1. User: Review Phase 4 validation summary — expected result: Phase 4 accepted as complete.
+2. User: Commit manually when ready — expected result: Phase 4 queue/worker behavior captured in Git history.
+3. User/Codex: Plan the next phase — expected result: dashboard, simulator, or replay scope remains explicitly phase-gated.
 
 ## 14. Handoff notes
 
 - Start here next: `TASK-001`
-- Read first: `README.md`, `apps/api/src/app.ts`, `apps/api/src/services/ingest-webhook.ts`, `packages/queue/src/index.ts`, and `packages/db/src/repositories/webhook-events.ts`
-- Commands to run first for Phase 4 setup check: `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test -- --run`
+- Read first: `README.md`, `packages/queue/src/index.ts`, `apps/worker/src/worker.ts`, `apps/worker/src/delivery-processor.ts`, and `apps/api/src/services/ingest-webhook.ts`
+- Commands to run first for next-phase setup check: `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test -- --run`
 - Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior outside the approved phase.
-- Watch for: Phase 4 scope creep and any request that would introduce dashboard/simulator behavior, real provider credentials, or paid API usage before those are approved.
-- Suggested next prompt: `Start Phase 4 BullMQ queue and worker processing in local mock-only mode after reviewing Phase 3.`
+- Watch for: next-phase scope creep and any request that would introduce real provider credentials, paid API usage, provider SDKs, or deployment automation before those are approved.
+- Suggested next prompt: `Start the next phase after reviewing Phase 4 validation and choosing dashboard, simulator, or replay scope.`

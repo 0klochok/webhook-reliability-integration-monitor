@@ -1,7 +1,8 @@
 import {
   createRetryPolicyFromEnv,
   createDeliveryJobData,
-  createDeliveryJobId
+  createDeliveryJobId,
+  createReplayDeliveryJobId
 } from "@webhook-monitor/queue";
 import {
   createTestDatabaseClient,
@@ -11,6 +12,7 @@ import {
 import {
   createDeadLetterEventsRepository,
   createDeliveryAttemptsRepository,
+  createManualReplaysRepository,
   createWebhookEventRepository,
   type DatabaseClient,
   type WebhookEvent
@@ -91,6 +93,45 @@ const createPersistedQueuedEvent = async (
   return result.event;
 };
 
+const createPersistedEventWithStatus = async (
+  behavior: MockDeliveryBehavior,
+  externalEventId: string,
+  currentStatus: WebhookEvent["currentStatus"]
+): Promise<WebhookEvent> => {
+  const events = createWebhookEventRepository(client.db);
+  const normalizedEvent = createNormalizedEventFixture({
+    providerId: "generic-http",
+    externalEventId,
+    eventType: "order.fulfilled",
+    signatureVerificationRequired: false,
+    payload: {
+      eventId: externalEventId,
+      eventType: "order.fulfilled",
+      occurredAt: "2026-06-20T12:00:00.000Z",
+      source: "worker-replay-test",
+      idempotencyKey: `${externalEventId}:idempotency`,
+      payload: {
+        deliveryBehavior: behavior
+      },
+      metadata: {
+        environment: "test"
+      }
+    }
+  });
+  const result = await events.createWithInitialStatusHistory({
+    normalizedEvent,
+    currentStatus,
+    createdAt: new Date(baseTime),
+    updatedAt: new Date(baseTime),
+    initialHistory: {
+      reasonCode: "replay_fixture",
+      createdAt: new Date(baseTime)
+    }
+  });
+
+  return result.event;
+};
+
 const createDependencies = (
   clock = createClock(),
   maxAttempts = 3
@@ -98,6 +139,7 @@ const createDependencies = (
   webhookEvents: createWebhookEventRepository(client.db),
   deliveryAttempts: createDeliveryAttemptsRepository(client.db),
   deadLetterEvents: createDeadLetterEventsRepository(client.db),
+  manualReplays: createManualReplaysRepository(client.db),
   downstreamClient: createPayloadDrivenMockDownstreamClient(),
   retryPolicy: createRetryPolicy(maxAttempts),
   targetUrl: "http://localhost:3000/mock-downstream/deliver",
@@ -111,6 +153,26 @@ const createJob = (event: WebhookEvent, attemptsMade: number) => ({
     providerId: event.providerId,
     externalEventId: event.externalEventId,
     enqueuedAt: "2026-06-20T12:00:00.000Z"
+  }),
+  attemptsMade
+});
+
+const createReplayJob = (
+  event: WebhookEvent,
+  manualReplayId: string,
+  attemptsMade: number,
+  initialAttemptNumber: number
+) => ({
+  id: createReplayDeliveryJobId(manualReplayId),
+  data: createDeliveryJobData({
+    eventId: event.id,
+    providerId: event.providerId,
+    externalEventId: event.externalEventId,
+    enqueuedAt: "2026-06-20T12:00:00.000Z",
+    replayOfEventId: event.id,
+    manualReplayId,
+    requestedBy: "local-operator",
+    initialAttemptNumber
   }),
   attemptsMade
 });
@@ -300,5 +362,108 @@ describe("delivery processor", () => {
         attemptsMade: 0
       })
     ).rejects.toBeInstanceOf(MissingWebhookEventError);
+  });
+
+  it("processes a manual replay of a dead-lettered event and completes the replay audit", async () => {
+    const event = await createPersistedEventWithStatus(
+      "success",
+      "worker-replay-success-1",
+      "dead_lettered"
+    );
+    const dependencies = createDependencies();
+    await dependencies.deliveryAttempts.createDeliveryAttempt({
+      eventId: event.id,
+      attemptNumber: 1,
+      status: "failed_retryable"
+    });
+    await dependencies.deliveryAttempts.createDeliveryAttempt({
+      eventId: event.id,
+      attemptNumber: 2,
+      status: "failed_retryable"
+    });
+    await dependencies.deadLetterEvents.createDeadLetterEvent({
+      eventId: event.id,
+      reasonCode: "max_attempts_exhausted",
+      finalAttemptNumber: 2,
+      deadLetteredAt: new Date(baseTime)
+    });
+    const replay = await dependencies.manualReplays.createManualReplay({
+      originalEventId: event.id,
+      requestedBy: "local-operator",
+      status: "queued",
+      requestedAt: new Date(baseTime)
+    });
+
+    const result = await processDeliveryJob(dependencies, createReplayJob(event, replay.id, 0, 3));
+    const updatedEvent = await dependencies.webhookEvents.getById(event.id);
+    const attempts = await dependencies.deliveryAttempts.listAttemptsForEvent(event.id);
+    const replayRows = await dependencies.manualReplays.listReplaysForOriginalEvent(event.id);
+    const history = await dependencies.webhookEvents.listStatusHistory(event.id);
+
+    expect(result).toMatchObject({
+      outcome: "delivered",
+      attemptNumber: 3
+    });
+    expect(updatedEvent?.currentStatus).toBe("delivered");
+    expect(attempts.map((attempt) => attempt.attemptNumber)).toEqual([1, 2, 3]);
+    expect(attempts[2]).toMatchObject({
+      status: "succeeded",
+      httpStatusCode: 200
+    });
+    expect(replayRows[0]).toMatchObject({
+      id: replay.id,
+      status: "completed"
+    });
+    expect(history.map((entry) => entry.toStatus)).toContain("processing");
+    expect(history.map((entry) => entry.toStatus)).toContain("delivered");
+  });
+
+  it("marks manual replay failed and updates the dead-letter record on final replay failure", async () => {
+    const event = await createPersistedEventWithStatus(
+      "always-retryable-fail",
+      "worker-replay-final-failure-1",
+      "dead_lettered"
+    );
+    const dependencies = createDependencies(createClock(), 2);
+    await dependencies.deliveryAttempts.createDeliveryAttempt({
+      eventId: event.id,
+      attemptNumber: 3,
+      status: "failed_retryable"
+    });
+    await dependencies.deadLetterEvents.createDeadLetterEvent({
+      eventId: event.id,
+      reasonCode: "max_attempts_exhausted",
+      finalAttemptNumber: 3,
+      deadLetteredAt: new Date(baseTime)
+    });
+    const replay = await dependencies.manualReplays.createManualReplay({
+      originalEventId: event.id,
+      requestedBy: "local-operator",
+      status: "queued",
+      requestedAt: new Date(baseTime)
+    });
+
+    await expect(
+      processDeliveryJob(dependencies, createReplayJob(event, replay.id, 0, 4))
+    ).rejects.toBeInstanceOf(RetryableMockDeliveryError);
+    await expect(
+      processDeliveryJob(dependencies, createReplayJob(event, replay.id, 1, 4))
+    ).rejects.toBeInstanceOf(RetryableMockDeliveryError);
+
+    const updatedEvent = await dependencies.webhookEvents.getById(event.id);
+    const attempts = await dependencies.deliveryAttempts.listAttemptsForEvent(event.id);
+    const deadLetter = await dependencies.deadLetterEvents.getDeadLetterByEventId(event.id);
+    const replayRows = await dependencies.manualReplays.listReplaysForOriginalEvent(event.id);
+
+    expect(updatedEvent?.currentStatus).toBe("dead_lettered");
+    expect(attempts.map((attempt) => attempt.attemptNumber)).toEqual([3, 4, 5]);
+    expect(deadLetter).toMatchObject({
+      reasonCode: "max_attempts_exhausted",
+      finalAttemptNumber: 5
+    });
+    expect(replayRows[0]).toMatchObject({
+      id: replay.id,
+      status: "failed"
+    });
   });
 });

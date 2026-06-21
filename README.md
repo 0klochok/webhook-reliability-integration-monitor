@@ -31,6 +31,14 @@ successful events as delivered, and creates dead-letter records after retry exha
 mock failures. Phase 4 still does not add dashboard pages, manual replay UI, simulator commands,
 provider SDKs, real provider calls, paid API usage, GitHub Actions, or app containers.
 
+Phase 5 adds a local Hono-rendered dashboard and manual replay flow. The dashboard shows integration
+health metrics, recent events, status filtering, event details, delivery attempts, dead-letter
+records, and manual replay audit records. Manual replay is local-demo only: eligible failed or
+dead-lettered events create a `manual_replays` audit row, enqueue a replay-specific BullMQ job, and
+let the worker process the event without weakening normal webhook idempotency. Phase 5 still does
+not add simulator commands, frontend frameworks, provider SDKs, real provider calls, paid API usage,
+GitHub Actions, deployment, or production authentication.
+
 ## Problem Statement
 
 Business automations often depend on webhooks from payment providers, CRMs, scheduling tools, and
@@ -346,7 +354,15 @@ docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_mo
 
 docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c "select e.external_event_id, h.from_status, h.to_status, h.reason_code from event_status_history h join webhook_events e on e.id = h.event_id where e.external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1') order by e.external_event_id, h.created_at;"
 
-docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c "select e.external_event_id, d.reason_code, d.final_attempt_number from dead_letter_events d join webhook_events e on e.id = d.event_id where e.external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1') order by e.external_event_id;"
+$deadLetterSql = @"
+select e.external_event_id, d.reason_code, d.final_attempt_number
+from dead_letter_events d
+join webhook_events e on e.id = d.event_id
+where e.external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1')
+order by e.external_event_id;
+"@
+
+docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c $deadLetterSql
 ```
 
 Expected manual QA results:
@@ -377,6 +393,94 @@ pnpm lint
 pnpm typecheck
 git status --short
 ```
+
+## Phase 5 Dashboard and Manual Replay
+
+Phase 5 makes webhook reliability visible and operator-actionable through server-rendered Hono HTML
+and small JSON endpoints for tests and future UI extension.
+
+Dashboard routes:
+
+- `GET /dashboard` — integration health summary and navigation.
+- `GET /dashboard/events` — recent events, newest first, with optional `?status=<event_status>`.
+- `GET /dashboard/events/:eventId` — canonical event fields, status history, delivery attempts,
+  dead-letter record, manual replay audit records, and a trimmed collapsed payload preview.
+- `GET /dashboard/dead-letter` — dead-letter records newest first.
+- `POST /dashboard/events/:eventId/replay` — local form action for manual replay.
+
+JSON routes return `{ "ok": true, "data": ... }` on success and `{ "ok": false, "error": ... }` on
+safe failures:
+
+- `GET /api/dashboard/summary`
+- `GET /api/dashboard/events`
+- `GET /api/dashboard/events/:eventId`
+- `GET /api/dashboard/dead-letter`
+- `POST /api/dashboard/events/:eventId/replay`
+
+Summary metric definitions:
+
+- `totalEventVolume`: count of `webhook_events` rows.
+- `successRate`: delivered events divided by accepted non-rejected events, returned as a `0..1`
+  number in JSON and rendered as a percentage in HTML.
+- `failedEvents`: events whose current status is `failed_retryable` or `dead_lettered`.
+- `retryCount`: delivery attempts where `attempt_number > 1`.
+- `deadLetterCount`: count of `dead_letter_events` rows.
+- `lastSuccessfulEvent`: most recent event with `last_successful_at`.
+
+Manual replay behavior:
+
+- Replay is allowed only for `dead_lettered` and `failed_retryable` events.
+- Replay is not allowed for delivered, queued, processing, received, validated, duplicate, rejected,
+  or `retry_scheduled` events. `retry_scheduled` is blocked because the dashboard cannot safely prove
+  no active BullMQ retry is pending from database state alone.
+- Each replay request creates one `manual_replays` audit row, appends replay request status history,
+  enqueues one replay-specific job ID of the form `delivery-replay-<manualReplayId>`, and marks the
+  audit row queued.
+- If enqueue fails, the audit row is marked failed and the API returns a safe 500 response.
+- Replay jobs continue delivery attempt numbering after the latest existing attempt. Normal webhook
+  delivery jobs still use `delivery-<eventId>` and remain idempotent by canonical event ID.
+
+Local-demo security note: the dashboard is not production-authenticated. Do not expose it publicly
+without adding authentication, authorization, CSRF protection, and deployment hardening in a later
+phase. No real provider APIs, provider SDKs, simulator commands, or paid services are used in Phase 5.
+
+Phase 5 validation commands:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
+pnpm install
+pnpm db:generate
+pnpm db:migrate
+pnpm test -- --run
+pnpm format:check
+pnpm lint
+pnpm typecheck
+git status --short
+```
+
+Long-running local commands:
+
+```powershell
+pnpm dev:api
+pnpm dev:worker
+```
+
+Run `pnpm dev:api` and `pnpm dev:worker` in separate PowerShell terminals. The API process prints the
+dashboard URL; the expected local URL is usually `http://localhost:3000/dashboard`. Both commands are
+long-running.
+
+Manual verification checklist:
+
+- Load `http://localhost:3000/dashboard`.
+- Confirm summary counts render.
+- Create or seed failed/dead-letter data.
+- Confirm counts update.
+- Open `/dashboard/dead-letter`.
+- Replay a failed or dead-letter event.
+- Confirm a `manual_replays` audit record is created.
+- Confirm a replay-specific queue job is enqueued.
+- Confirm the worker processes the replay.
+- Confirm event status and history update.
 
 ## Phase 0 Validation Commands
 

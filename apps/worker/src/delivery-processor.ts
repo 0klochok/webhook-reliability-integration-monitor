@@ -9,6 +9,7 @@ import {
 import type {
   createDeadLetterEventsRepository,
   createDeliveryAttemptsRepository,
+  createManualReplaysRepository,
   createWebhookEventRepository,
   WebhookEvent
 } from "@webhook-monitor/db";
@@ -27,11 +28,13 @@ import type {
 export type WebhookEventRepository = ReturnType<typeof createWebhookEventRepository>;
 export type DeliveryAttemptsRepository = ReturnType<typeof createDeliveryAttemptsRepository>;
 export type DeadLetterEventsRepository = ReturnType<typeof createDeadLetterEventsRepository>;
+export type ManualReplaysRepository = ReturnType<typeof createManualReplaysRepository>;
 
 export interface DeliveryProcessorDependencies {
   readonly webhookEvents: WebhookEventRepository;
   readonly deliveryAttempts: DeliveryAttemptsRepository;
   readonly deadLetterEvents: DeadLetterEventsRepository;
+  readonly manualReplays: ManualReplaysRepository;
   readonly downstreamClient: MockDownstreamClient;
   readonly retryPolicy: RetryPolicy;
   readonly targetUrl: string;
@@ -57,7 +60,26 @@ export type DeliveryProcessorResult =
       readonly attemptNumber?: number;
     };
 
-const getAttemptNumber = (job: DeliveryProcessorJob): number => job.attemptsMade + 1;
+const getJobAttemptNumber = (job: DeliveryProcessorJob): number => job.attemptsMade + 1;
+
+const isReplayJob = (job: DeliveryProcessorJob): boolean => job.data.manualReplayId !== undefined;
+
+const getAttemptNumber = async (
+  dependencies: DeliveryProcessorDependencies,
+  job: DeliveryProcessorJob,
+  eventId: string
+): Promise<number> => {
+  if (!isReplayJob(job)) {
+    return getJobAttemptNumber(job);
+  }
+
+  if (job.data.initialAttemptNumber) {
+    return job.data.initialAttemptNumber + job.attemptsMade;
+  }
+
+  const latestAttempt = await dependencies.deliveryAttempts.getLatestAttemptForEvent(eventId);
+  return (latestAttempt?.attemptNumber ?? 0) + 1;
+};
 
 const getDurationMs = (startedAt: Date, completedAt: Date): number =>
   Math.max(0, completedAt.getTime() - startedAt.getTime());
@@ -68,10 +90,13 @@ const toFailureMessage = (result: Extract<MockDownstreamDeliveryResult, { ok: fa
 const createFailureMetadata = (input: {
   readonly job: DeliveryProcessorJob;
   readonly attemptNumber: number;
+  readonly jobAttemptNumber: number;
   readonly result: Extract<MockDownstreamDeliveryResult, { ok: false }>;
 }): JsonObject => ({
   queueJobId: input.job.id ?? null,
   attemptNumber: input.attemptNumber,
+  jobAttemptNumber: input.jobAttemptNumber,
+  manualReplayId: input.job.data.manualReplayId ?? null,
   httpStatusCode: input.result.httpStatusCode,
   errorCode: input.result.errorCode
 });
@@ -79,12 +104,63 @@ const createFailureMetadata = (input: {
 const createSuccessMetadata = (input: {
   readonly job: DeliveryProcessorJob;
   readonly attemptNumber: number;
+  readonly jobAttemptNumber: number;
   readonly httpStatusCode: number;
 }): JsonObject => ({
   queueJobId: input.job.id ?? null,
   attemptNumber: input.attemptNumber,
+  jobAttemptNumber: input.jobAttemptNumber,
+  manualReplayId: input.job.data.manualReplayId ?? null,
   httpStatusCode: input.httpStatusCode
 });
+
+const markManualReplayCompleted = async (
+  dependencies: DeliveryProcessorDependencies,
+  input: {
+    readonly job: DeliveryProcessorJob;
+    readonly completedAt: Date;
+    readonly attemptNumber: number;
+  }
+): Promise<void> => {
+  if (!input.job.data.manualReplayId) {
+    return;
+  }
+
+  await dependencies.manualReplays.markReplayCompleted(
+    input.job.data.manualReplayId,
+    input.completedAt,
+    {
+      queueJobId: input.job.id ?? null,
+      attemptNumber: input.attemptNumber
+    }
+  );
+};
+
+const markManualReplayFailed = async (
+  dependencies: DeliveryProcessorDependencies,
+  input: {
+    readonly job: DeliveryProcessorJob;
+    readonly completedAt: Date;
+    readonly attemptNumber: number;
+    readonly errorCode: string;
+    readonly errorMessage: string;
+  }
+): Promise<void> => {
+  if (!input.job.data.manualReplayId) {
+    return;
+  }
+
+  await dependencies.manualReplays.markReplayFailed(
+    input.job.data.manualReplayId,
+    input.completedAt,
+    {
+      queueJobId: input.job.id ?? null,
+      attemptNumber: input.attemptNumber,
+      errorCode: input.errorCode,
+      errorMessage: input.errorMessage
+    }
+  );
+};
 
 const deadLetterEvent = async (
   dependencies: DeliveryProcessorDependencies,
@@ -97,7 +173,7 @@ const deadLetterEvent = async (
     readonly metadata: JsonValue;
   }
 ): Promise<void> => {
-  await dependencies.deadLetterEvents.createOrGetDeadLetterEvent({
+  await dependencies.deadLetterEvents.createOrUpdateDeadLetterEvent({
     eventId: input.event.id,
     reasonCode: input.reasonCode,
     errorMessage: input.errorMessage,
@@ -124,6 +200,7 @@ const handleSuccess = async (
     readonly job: DeliveryProcessorJob;
     readonly attemptId: string;
     readonly attemptNumber: number;
+    readonly jobAttemptNumber: number;
     readonly startedAt: Date;
     readonly result: Extract<MockDownstreamDeliveryResult, { ok: true }>;
   }
@@ -146,9 +223,16 @@ const handleSuccess = async (
     metadata: createSuccessMetadata({
       job: input.job,
       attemptNumber: input.attemptNumber,
+      jobAttemptNumber: input.jobAttemptNumber,
       httpStatusCode: input.result.httpStatusCode
     }),
     changedAt: completedAt
+  });
+
+  await markManualReplayCompleted(dependencies, {
+    job: input.job,
+    completedAt,
+    attemptNumber: input.attemptNumber
   });
 
   return {
@@ -165,15 +249,17 @@ const handleRetryableFailure = async (
     readonly job: DeliveryProcessorJob;
     readonly attemptId: string;
     readonly attemptNumber: number;
+    readonly jobAttemptNumber: number;
     readonly startedAt: Date;
     readonly result: Extract<MockDownstreamDeliveryResult, { ok: false; retryable: true }>;
   }
 ): Promise<never> => {
   const completedAt = dependencies.clock?.() ?? new Date();
-  const hasAttemptsRemaining = input.attemptNumber < dependencies.retryPolicy.maxAttempts;
+  const hasAttemptsRemaining = input.jobAttemptNumber < dependencies.retryPolicy.maxAttempts;
   const nextRetryAt = hasAttemptsRemaining
     ? new Date(
-        completedAt.getTime() + calculateRetryDelayMs(input.attemptNumber, dependencies.retryPolicy)
+        completedAt.getTime() +
+          calculateRetryDelayMs(input.jobAttemptNumber, dependencies.retryPolicy)
       )
     : null;
 
@@ -213,6 +299,14 @@ const handleRetryableFailure = async (
     metadata: createFailureMetadata(input)
   });
 
+  await markManualReplayFailed(dependencies, {
+    job: input.job,
+    completedAt,
+    attemptNumber: input.attemptNumber,
+    errorCode: input.result.errorCode,
+    errorMessage: input.result.errorMessage
+  });
+
   throw new RetryableMockDeliveryError(input.result.errorMessage, "max_attempts_exhausted");
 };
 
@@ -223,6 +317,7 @@ const handlePermanentFailure = async (
     readonly job: DeliveryProcessorJob;
     readonly attemptId: string;
     readonly attemptNumber: number;
+    readonly jobAttemptNumber: number;
     readonly startedAt: Date;
     readonly result: Extract<MockDownstreamDeliveryResult, { ok: false; retryable: false }>;
   }
@@ -248,6 +343,14 @@ const handlePermanentFailure = async (
     metadata: createFailureMetadata(input)
   });
 
+  await markManualReplayFailed(dependencies, {
+    job: input.job,
+    completedAt,
+    attemptNumber: input.attemptNumber,
+    errorCode: input.result.errorCode,
+    errorMessage: input.result.errorMessage
+  });
+
   throw new PermanentMockDeliveryError(input.result.errorMessage);
 };
 
@@ -261,7 +364,10 @@ export const processDeliveryJob = async (
     throw new MissingWebhookEventError(job.data.eventId);
   }
 
-  if (isTerminalStatus(event.currentStatus)) {
+  if (
+    isTerminalStatus(event.currentStatus) &&
+    !(isReplayJob(job) && event.currentStatus === "dead_lettered")
+  ) {
     return {
       outcome: "skipped_terminal_status",
       eventId: event.id,
@@ -269,7 +375,8 @@ export const processDeliveryJob = async (
     };
   }
 
-  const attemptNumber = getAttemptNumber(job);
+  const attemptNumber = await getAttemptNumber(dependencies, job, event.id);
+  const jobAttemptNumber = getJobAttemptNumber(job);
   const startedAt = dependencies.clock?.() ?? new Date();
   const attemptResult = await dependencies.deliveryAttempts.createOrGetDeliveryAttempt({
     eventId: event.id,
@@ -297,6 +404,8 @@ export const processDeliveryJob = async (
     metadata: {
       queueJobId: job.id ?? null,
       attemptNumber,
+      jobAttemptNumber,
+      manualReplayId: job.data.manualReplayId ?? null,
       targetUrl: dependencies.targetUrl
     },
     changedAt: startedAt
@@ -314,6 +423,7 @@ export const processDeliveryJob = async (
       job,
       attemptId: attemptResult.attempt.id,
       attemptNumber,
+      jobAttemptNumber,
       startedAt,
       result: deliveryResult
     });
@@ -325,6 +435,7 @@ export const processDeliveryJob = async (
       job,
       attemptId: attemptResult.attempt.id,
       attemptNumber,
+      jobAttemptNumber,
       startedAt,
       result: deliveryResult
     });
@@ -335,6 +446,7 @@ export const processDeliveryJob = async (
     job,
     attemptId: attemptResult.attempt.id,
     attemptNumber,
+    jobAttemptNumber,
     startedAt,
     result: deliveryResult
   });

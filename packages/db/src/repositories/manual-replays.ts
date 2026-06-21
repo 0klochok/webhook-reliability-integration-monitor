@@ -25,6 +25,16 @@ export interface UpdateManualReplayStatusInput {
 }
 
 export const createManualReplaysRepository = (db: Database) => ({
+  getManualReplayById: async (replayId: string): Promise<ManualReplay | undefined> => {
+    const [manualReplay] = await db
+      .select()
+      .from(manualReplays)
+      .where(eq(manualReplays.id, replayId))
+      .limit(1);
+
+    return manualReplay;
+  },
+
   createManualReplay: async (input: CreateManualReplayInput): Promise<ManualReplay> => {
     const now = input.createdAt ?? new Date();
     const [manualReplay] = await db
@@ -63,6 +73,67 @@ export const createManualReplaysRepository = (db: Database) => ({
 
     if (!manualReplay) {
       throw new Error(`Manual replay "${input.replayId}" was not found.`);
+    }
+
+    return manualReplay;
+  },
+
+  markReplayQueued: async (replayId: string, metadata?: JsonValue): Promise<ManualReplay> => {
+    const [manualReplay] = await db
+      .update(manualReplays)
+      .set({
+        status: "queued",
+        metadata
+      })
+      .where(eq(manualReplays.id, replayId))
+      .returning();
+
+    if (!manualReplay) {
+      throw new Error(`Manual replay "${replayId}" was not found.`);
+    }
+
+    return manualReplay;
+  },
+
+  markReplayCompleted: async (
+    replayId: string,
+    completedAt = new Date(),
+    metadata?: JsonValue
+  ): Promise<ManualReplay> => {
+    const [manualReplay] = await db
+      .update(manualReplays)
+      .set({
+        status: "completed",
+        completedAt,
+        metadata
+      })
+      .where(eq(manualReplays.id, replayId))
+      .returning();
+
+    if (!manualReplay) {
+      throw new Error(`Manual replay "${replayId}" was not found.`);
+    }
+
+    return manualReplay;
+  },
+
+  markReplayFailed: async (
+    replayId: string,
+    completedAt = new Date(),
+    metadata?: JsonValue
+  ): Promise<ManualReplay> => {
+    const [manualReplay] = await db
+      .update(manualReplays)
+      .set({
+        status: "failed",
+        completedAt,
+        metadata
+      })
+      .where(eq(manualReplays.id, replayId))
+      .returning();
+
+    if (!manualReplay) {
+      throw new Error(`Manual replay "${replayId}" was not found.`);
     }
 
     return manualReplay;

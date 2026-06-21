@@ -1,5 +1,9 @@
 import { serve } from "@hono/node-server";
-import { createDatabaseClient, createWebhookEventRepository } from "@webhook-monitor/db";
+import {
+  createDashboardRepository,
+  createDatabaseClient,
+  createWebhookEventRepository
+} from "@webhook-monitor/db";
 import { createBullMqDeliveryQueue } from "@webhook-monitor/queue";
 
 import { createApp } from "./app.js";
@@ -15,6 +19,7 @@ const deliveryQueue = createBullMqDeliveryQueue();
 const app = createApp({
   config,
   webhookEvents: createWebhookEventRepository(database.db),
+  dashboard: createDashboardRepository(database.db),
   deliveryQueue
 });
 
@@ -26,6 +31,7 @@ const server = serve(
   },
   (info) => {
     console.log(`webhook-reliability-api listening on http://${info.address}:${info.port}`);
+    console.log(`dashboard available at http://${info.address}:${info.port}/dashboard`);
   }
 );
 

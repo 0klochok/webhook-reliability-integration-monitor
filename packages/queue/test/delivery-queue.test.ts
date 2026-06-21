@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createBullMqDeliveryQueue,
   createDeliveryJobId,
+  createReplayDeliveryJobId,
   createRetryPolicyFromEnv,
   createTestQueueName,
   obliterateLocalTestQueue,
@@ -67,5 +68,42 @@ describe("BullMQ delivery queue", () => {
       enqueuedAt: "2026-06-20T12:00:00.000Z"
     });
     expect(Object.values(counts).reduce((total, count) => total + count, 0)).toBe(1);
+  });
+
+  it("enqueues replay jobs with replay-specific stable ids", async () => {
+    const eventId = "22222222-2222-4222-8222-222222222222";
+    const manualReplayId = "33333333-3333-4333-8333-333333333333";
+    const deliveryQueue = createBullMqDeliveryQueue({
+      queueName: createTestQueueName(),
+      redisUrl,
+      retryPolicy: createRetryPolicyFromEnv({
+        DELIVERY_MAX_ATTEMPTS: "3",
+        DELIVERY_INITIAL_DELAY_MS: "10",
+        DELIVERY_BACKOFF_MULTIPLIER: "2",
+        DELIVERY_MAX_DELAY_MS: "50"
+      }),
+      clock: () => new Date("2026-06-20T12:00:00.000Z")
+    });
+    queues.push(deliveryQueue);
+
+    const normal = await deliveryQueue.enqueueDelivery({
+      eventId,
+      providerId: "generic-http",
+      externalEventId: "generic-event-1"
+    });
+    const replay = await deliveryQueue.enqueueDelivery({
+      eventId,
+      providerId: "generic-http",
+      externalEventId: "generic-event-1",
+      manualReplayId,
+      replayOfEventId: eventId,
+      requestedBy: "local-operator",
+      initialAttemptNumber: 4
+    });
+
+    expect(normal.queueJobId).toBe(createDeliveryJobId(eventId));
+    expect(replay.queueJobId).toBe(createReplayDeliveryJobId(manualReplayId));
+    await expect(deliveryQueue.queue.getJob(normal.queueJobId)).resolves.not.toBeNull();
+    await expect(deliveryQueue.queue.getJob(replay.queueJobId)).resolves.not.toBeNull();
   });
 });

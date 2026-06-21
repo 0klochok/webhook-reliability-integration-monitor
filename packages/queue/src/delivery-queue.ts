@@ -4,7 +4,7 @@ import type { Redis } from "ioredis";
 import { closeRedisConnection, createQueueRedisConnection } from "./connection.js";
 import {
   createDeliveryJobData,
-  createDeliveryJobId,
+  createDeliveryQueueJobId,
   type DeliveryJobData,
   type DeliveryQueuePort,
   type EnqueueDeliveryInput,
@@ -47,7 +47,7 @@ export class BullMqDeliveryQueue implements DeliveryQueuePort {
 
   async enqueueDelivery(input: EnqueueDeliveryInput): Promise<EnqueueDeliveryResult> {
     const data = createDeliveryJobData(input, this.clock);
-    const jobId = createDeliveryJobId(data.eventId);
+    const jobId = createDeliveryQueueJobId(data);
     const job = await this.queue.add(deliveryJobName, data, {
       ...createDeliveryJobOptions(this.retryPolicy),
       jobId
@@ -96,6 +96,6 @@ export const createBullMqDeliveryQueue = (
 export const createNoopDeliveryQueue = (): DeliveryQueuePort => ({
   enqueueDelivery: async (input) => ({
     queued: true,
-    queueJobId: createDeliveryJobId(input.eventId)
+    queueJobId: createDeliveryQueueJobId(input)
   })
 });

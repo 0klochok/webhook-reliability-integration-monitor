@@ -85,6 +85,41 @@ export const createDeadLetterEventsRepository = (db: Database) => ({
     };
   },
 
+  createOrUpdateDeadLetterEvent: async (
+    input: CreateDeadLetterEventInput
+  ): Promise<DeadLetterEvent> => {
+    const now = input.createdAt ?? new Date();
+    const deadLetteredAt = input.deadLetteredAt ?? now;
+    const [deadLetterEvent] = await db
+      .insert(deadLetterEvents)
+      .values({
+        eventId: input.eventId,
+        reasonCode: input.reasonCode,
+        errorMessage: input.errorMessage ?? null,
+        finalAttemptNumber: input.finalAttemptNumber ?? null,
+        payloadSnapshot: input.payloadSnapshot ?? null,
+        deadLetteredAt,
+        createdAt: now
+      })
+      .onConflictDoUpdate({
+        target: deadLetterEvents.eventId,
+        set: {
+          reasonCode: input.reasonCode,
+          errorMessage: input.errorMessage ?? null,
+          finalAttemptNumber: input.finalAttemptNumber ?? null,
+          payloadSnapshot: input.payloadSnapshot ?? null,
+          deadLetteredAt
+        }
+      })
+      .returning();
+
+    if (!deadLetterEvent) {
+      throw new Error("Failed to create or update dead-letter event.");
+    }
+
+    return deadLetterEvent;
+  },
+
   getDeadLetterByEventId: async (eventId: string): Promise<DeadLetterEvent | undefined> => {
     const [deadLetterEvent] = await db
       .select()

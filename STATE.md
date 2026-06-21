@@ -9,7 +9,7 @@
 - Contributors: Codex
 - Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
 - Current branch: `main`
-- Current phase: Phase 4.2 — Manual QA recording docs patch
+- Current phase: Phase 5 — Dashboard and manual replay
 - Overall status: green
 - Quality gate status: green
 - Completion: 100%
@@ -25,19 +25,19 @@
 
 ## 1. Current objective
 
-- Phase objective: Record provided Phase 4 manual webhook E2E QA evidence in docs without product code, test, dependency, migration, workspace, or infra changes.
+- Phase objective: Make webhook reliability visible and operator-actionable through a local Hono-rendered dashboard and manual replay flow.
 - Deadline / target date: none
-- Definition of done: `STATE.md` records the provided success, retry-then-success, and permanent dead-letter manual QA evidence as passed; the optional retry-exhaustion variant is recorded as not run; README dead-letter SQL inspection covers all three manual QA event IDs.
-- Primary user-visible signal: Phase 4 manual QA status in `STATE.md` reflects the provided local API/worker/SQL inspection evidence.
-- Secondary checks: `docker compose -f .\infra\docker-compose.yml ps`, `git diff --check`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`, `pnpm -r --if-present build`, and `git status --short`.
-- Out of scope: dashboard pages, manual replay UI, simulator commands, GitHub Actions, commits, pushes, tags, app containers, provider SDKs, real provider APIs, and paid API usage.
+- Definition of done: Dashboard summary/list/detail/dead-letter routes exist; manual replay creates audit rows, replay-specific queue jobs, worker replay attempts, status history, and safe errors; README documents Phase 5 behavior and validation.
+- Primary user-visible signal: `http://localhost:3000/dashboard` renders local webhook health and operator replay actions.
+- Secondary checks: Docker Postgres/Redis, `pnpm install`, Drizzle generate/migrate, Vitest, Prettier, ESLint, TypeScript, and `git status --short`.
+- Out of scope: simulator commands, GitHub Actions, commits, pushes, tags, deployment, frontend frameworks, provider SDKs, real provider APIs, and paid API usage.
 
 ## 2. Status snapshot
 
-- Summary: Phase 4 queue/worker behavior remains implemented and locally validated. Phase 4.2 is a docs-only QA recording patch for the provided local manual webhook E2E evidence; no product code, tests, dependencies, migrations, workspace, or infra files were changed.
-- Since last update: Recorded provided Phase 4 manual QA evidence for success, retry-then-success, and permanent dead-letter flows; marked retry exhaustion as optional and not run; confirmed no dedicated simulator CLI or automated manual-QA helper exists yet; kept `pnpm db:studio` as interactive/non-blocking.
-- Current focus: Ready for user review, manual commit, then Phase 5 planning.
-- Main uncertainty: none for Phase 4.
+- Summary: Phase 5 dashboard and manual replay behavior is implemented and locally validated. No new dependencies or schema migrations were added.
+- Since last update: Added DB dashboard queries, Hono HTML/JSON dashboard routes, replay-specific queue job IDs, worker replay handling, tests, README Phase 5 docs, and docs-only Phase 5 manual QA recording.
+- Current focus: Ready for user review and manual commit.
+- Main uncertainty: none for Phase 5.
 
 ## 3. Completed phases / milestones
 
@@ -50,6 +50,7 @@
 | Phase 4 — Queue / worker   | 2026-06-21 | BullMQ queue, worker processing, retries, delivery attempts, and dead-letter behavior.                 | green        | none        |
 | Phase 4.1 — Verification   | 2026-06-21 | Docs-only manual QA and validation-status clarification for Phase 4 webhook E2E checks.                | green        | none        |
 | Phase 4.2 — QA recording   | 2026-06-21 | Docs-only recording of provided Phase 4 manual webhook E2E QA evidence and skip reasons.               | green        | none        |
+| Phase 5 — Dashboard/replay | 2026-06-21 | Hono dashboard, dashboard JSON endpoints, manual replay audit, replay queue jobs, and worker replay.   | green        | none        |
 
 ## 4. Completed since last update
 
@@ -67,6 +68,8 @@
 - 2026-06-21: Implemented and validated Phase 4 queue/worker behavior — evidence: `packages/queue/src`, `packages/queue/test`, `apps/worker/src`, `apps/worker/test`, API BullMQ runtime wiring, DB idempotency helpers, README/env updates, and required validation gates passing.
 - 2026-06-21: Added Phase 4.1 verification docs patch — evidence: `README.md` manual QA steps and this `STATE.md` validation split.
 - 2026-06-21: Added Phase 4.2 docs-only QA recording patch — evidence: `STATE.md` records provided manual QA pass evidence for success, retry-then-success, and permanent dead-letter flows; `README.md` dead-letter SQL now checks all three manual QA event IDs.
+- 2026-06-21: Implemented and validated Phase 5 dashboard/manual replay — evidence: `apps/api/src/dashboard`, `packages/db/src/repositories/dashboard.ts`, replay updates in `packages/queue` and `apps/worker`, new Vitest coverage, README Phase 5 docs, and required gates passing.
+- 2026-06-21: Added Phase 5 docs-only validation patch — evidence: this `STATE.md` records provided dashboard, browser, manual replay, worker, and SQL verification results; `README.md` keeps SQL examples aligned with real FK columns.
 
 ## 5. Changed files
 
@@ -105,10 +108,56 @@
 | `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`           | Phase 4 scripts/dependencies         | updated | Adds BullMQ/ioredis/zod queue dependencies, worker scripts, and explicit pnpm build policy.                      |
 | `README.md`, `STATE.md`                                           | Phase 4.1 verification docs/status   | updated | Clarifies manual webhook E2E QA, SQL inspection, and validation categories; no product code changes.             |
 | `README.md`, `STATE.md`                                           | Phase 4.2 manual QA evidence record  | updated | Docs-only patch recording provided manual QA evidence and skip reasons; no product/test/dependency changes.      |
+| `apps/api/src/dashboard`, `apps/api/test/dashboard.test.ts`       | Phase 5 dashboard routes and tests   | updated | Server-rendered Hono dashboard, JSON endpoints, safe HTML rendering, and replay route tests.                     |
+| `packages/db/src/repositories/dashboard.ts`, db repository tests  | Phase 5 dashboard persistence APIs   | updated | Summary/list/detail/dead-letter queries, replay eligibility, replay audit creation, and metric tests.            |
+| `packages/queue`, `apps/worker`                                   | Phase 5 replay queue/worker support  | updated | Replay job metadata/IDs and worker replay success/failure audit behavior.                                        |
+| `README.md`, `STATE.md`                                           | Phase 5 manual QA docs record        | updated | Docs-only validation patch; no runtime code, tests, dependencies, migrations, workspace, or infra changes.       |
 
 ## 6. Validation and quality gates
 
 ### Required gates
+
+### Phase 5 dashboard and manual replay validation
+
+| Gate               | Command                                                             | Status  | Evidence / notes                                                                                     |
+| ------------------ | ------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| Docker services    | `docker compose -f .\infra\docker-compose.yml up -d postgres redis` | pass    | `webhook-monitor-postgres` and `webhook-monitor-redis` were already/running.                         |
+| install            | `pnpm install`                                                      | pass    | Scope all 7 workspace projects; already up to date with pnpm `v11.7.0`.                              |
+| migration generate | `pnpm db:generate`                                                  | pass    | Drizzle reported no schema changes and generated no new migration.                                   |
+| migration apply    | `pnpm db:migrate`                                                   | pass    | Existing migrations applied; Drizzle metadata notices were non-blocking already-exists notices.      |
+| tests              | `pnpm test -- --run`                                                | pass    | Final Vitest run: 15 test files and 94 tests passed.                                                 |
+| format             | `pnpm format:check`                                                 | pass    | `All matched files use Prettier code style!`.                                                        |
+| lint               | `pnpm lint`                                                         | pass    | `eslint .` completed with exit code 0 after fixing one unused local helper binding.                  |
+| typecheck          | `pnpm typecheck`                                                    | pass    | `tsc -b --pretty false` completed with exit code 0.                                                  |
+| dev commands       | `pnpm dev:api`; `pnpm dev:worker`                                   | skipped | Not started during automated validation because both are intentionally long-running local processes. |
+
+### Phase 5 manual dashboard and replay QA record
+
+| Check                         | Status | Evidence / notes                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API/dashboard process         | pass   | Provided manual QA evidence: `pnpm dev:api` started successfully, API listened on port `3000`, and `http://localhost:3000` was used for manual checks. `GET /health` returned `not_found`; this is not a Phase 5 blocker because the dashboard/API routes were reachable.                                                                                                  |
+| HTML dashboard routes         | pass   | `GET /dashboard`, `GET /dashboard/events`, and `GET /dashboard/dead-letter` returned HTTP `200`. Windows PowerShell checks required `Invoke-WebRequest -UseBasicParsing` for HTML routes.                                                                                                                                                                                  |
+| JSON dashboard routes         | pass   | `GET /api/dashboard/summary`, `GET /api/dashboard/events`, and `GET /api/dashboard/dead-letter` returned structured JSON with no errors.                                                                                                                                                                                                                                   |
+| Browser QA                    | pass   | `/dashboard`, `/dashboard/events`, and `/dashboard/dead-letter` rendered normally in the browser. After running the README manual E2E flow, all dashboard pages showed real event data and no empty-state-only view.                                                                                                                                                       |
+| Worker startup                | pass   | Provided manual QA evidence: `pnpm dev:worker` started successfully.                                                                                                                                                                                                                                                                                                       |
+| Manual replay request         | pass   | Replay was tested against event `39b6bb72-baa1-4afa-b76d-50408cd2e0d4`, external event id `generic-phase4-dead-letter-1`, with initial status `dead_lettered`. The replay API returned `ok: true` and `initialAttemptNumber: 2`.                                                                                                                                           |
+| Manual replay queue           | pass   | Manual replay id `7f924441-f26c-4782-839d-66bc8297f521` created queue job id `delivery-replay-7f924441-f26c-4782-839d-66bc8297f521`; the worker processed that replay job.                                                                                                                                                                                                 |
+| Permanent replay failure path | pass   | Worker logged expected permanent mock failure: `Mock downstream permanent failure.` The original event remained `dead_lettered`, which is expected for this permanent-failure demo event. Dashboard pages still rendered after replay failure.                                                                                                                             |
+| Manual replay audit row       | pass   | `manual_replays.status` became `failed`; `manual_replays.completed_at` was set; metadata recorded `errorCode=MOCK_DOWNSTREAM_PERMANENT`, `errorMessage=Mock downstream permanent failure.`, `attemptNumber=2`, and `queueJobId=delivery-replay-7f924441-f26c-4782-839d-66bc8297f521`.                                                                                      |
+| Delivery attempt verification | pass   | Schema check: `delivery_attempts.event_id` is the correct FK column; the earlier suspected webhook-event FK alias does not exist. SQL confirmed two attempts for event `39b6bb72-baa1-4afa-b76d-50408cd2e0d4`: attempt 1 and attempt 2 were both `failed_permanent`, HTTP `400`, `MOCK_DOWNSTREAM_PERMANENT`. This confirms manual replay did not reset attempt numbering. |
+
+### Phase 5 docs-only validation patch
+
+| Gate               | Command                                             | Status  | Evidence / notes                                                                                    |
+| ------------------ | --------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| docs SQL search    | Requested README/STATE invalid SQL reference search | pass    | Returned no matches after README SQL formatting cleanup.                                            |
+| format             | `pnpm format:check`                                 | pass    | Initial check found `STATE.md` formatting; targeted Prettier write fixed it and final check passed. |
+| tests              | `pnpm test -- --run`                                | skipped | Docs-only patch; no runtime code, test code, schema, or dependency files changed.                   |
+| lint               | `pnpm lint`                                         | skipped | Docs-only patch; no runtime code, test code, schema, or dependency files changed.                   |
+| typecheck          | `pnpm typecheck`                                    | skipped | Docs-only patch; no runtime code, test code, schema, or dependency files changed.                   |
+| Docker/API/worker  | `docker compose`, `pnpm dev:api`, `pnpm dev:worker` | skipped | This patch records already-provided manual QA evidence and does not require rerunning services.     |
+| dependency install | `pnpm install`                                      | skipped | No dependency or lockfile changes.                                                                  |
+| git status         | `git status --short`                                | pass    | Shows existing Phase 5 working tree plus docs changes; no staging, commit, push, or remote action.  |
 
 ### Phase 4.2 docs-only QA recording patch validation
 
@@ -272,10 +321,10 @@
 
 ## 7. Active tasks
 
-| ID       | Priority | Task                                                             | Owner      | Status | ETA  | Notes                                                     |
-| -------- | -------- | ---------------------------------------------------------------- | ---------- | ------ | ---- | --------------------------------------------------------- |
-| TASK-001 | P1       | Review Phase 4 validation result and commit manually when ready. | User       | todo   | none | Do not commit or push from Codex.                         |
-| TASK-002 | P2       | Plan next phase after Phase 4 is accepted.                       | User/Codex | todo   | none | Keep dashboard/simulator/manual replay scope phase-gated. |
+| ID       | Priority | Task                                                             | Owner      | Status | ETA  | Notes                                                 |
+| -------- | -------- | ---------------------------------------------------------------- | ---------- | ------ | ---- | ----------------------------------------------------- |
+| TASK-001 | P1       | Review Phase 5 validation result and commit manually when ready. | User       | todo   | none | Do not commit or push from Codex.                     |
+| TASK-002 | P2       | Choose the next phase after Phase 5 is accepted.                 | User/Codex | todo   | none | Keep simulator/deployment/provider scope phase-gated. |
 
 ## 8. Backlog / long horizon
 
@@ -287,7 +336,7 @@
 
 | ID        | Issue                             | Severity | Owner / layer | Next action | Target |
 | --------- | --------------------------------- | -------- | ------------- | ----------- | ------ |
-| ISSUE-001 | none currently known for Phase 4. | n/a      | n/a           | n/a         | n/a    |
+| ISSUE-001 | none currently known for Phase 5. | n/a      | n/a           | n/a         | n/a    |
 
 ## 10. Risks
 
@@ -298,15 +347,16 @@
 
 ## 11. Decisions since last update
 
-| ID      | Date       | Decision                                                              | Rationale                                                                                       | Tradeoff / consequence                                                 |
-| ------- | ---------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| DEC-001 | 2026-06-20 | Use pnpm workspace with local-only tooling.                           | Matches requested stack and phase gating.                                                       | Runtime dependencies deferred to later phases.                         |
-| DEC-002 | 2026-06-20 | Use Docker Compose for PostgreSQL and Redis.                          | Matches future architecture requirements.                                                       | Validation requires Docker Desktop to be running.                      |
-| DEC-003 | 2026-06-20 | Keep real provider APIs disabled by default.                          | Prevents paid/credentialed API use locally.                                                     | Later phases must use mocks unless approved.                           |
-| DEC-004 | 2026-06-20 | Use Hono for Phase 3 ingress.                                         | Matches requested stack and keeps tests serverless via `app.request()`.                         | Dashboard/UI remains deferred.                                         |
-| DEC-005 | 2026-06-20 | Keep queue as a placeholder port only.                                | Preserves Phase 3 boundary and prepares Phase 4 replacement.                                    | No Redis/BullMQ behavior yet.                                          |
-| DEC-006 | 2026-06-21 | Use BullMQ with stable job IDs and capped custom backoff for Phase 4. | Matches requested queue/worker stack and keeps retry policy configurable from local env.        | BullMQ rejects `:` in custom IDs, so job IDs use `delivery-<eventId>`. |
-| DEC-007 | 2026-06-21 | Keep downstream delivery payload-driven and local-only.               | Demonstrates success, retry, permanent failure, and dead-letter behavior without external APIs. | Real provider delivery remains deferred.                               |
+| ID      | Date       | Decision                                                               | Rationale                                                                                       | Tradeoff / consequence                                                 |
+| ------- | ---------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| DEC-001 | 2026-06-20 | Use pnpm workspace with local-only tooling.                            | Matches requested stack and phase gating.                                                       | Runtime dependencies deferred to later phases.                         |
+| DEC-002 | 2026-06-20 | Use Docker Compose for PostgreSQL and Redis.                           | Matches future architecture requirements.                                                       | Validation requires Docker Desktop to be running.                      |
+| DEC-003 | 2026-06-20 | Keep real provider APIs disabled by default.                           | Prevents paid/credentialed API use locally.                                                     | Later phases must use mocks unless approved.                           |
+| DEC-004 | 2026-06-20 | Use Hono for Phase 3 ingress.                                          | Matches requested stack and keeps tests serverless via `app.request()`.                         | Dashboard/UI remains deferred.                                         |
+| DEC-005 | 2026-06-20 | Keep queue as a placeholder port only.                                 | Preserves Phase 3 boundary and prepares Phase 4 replacement.                                    | No Redis/BullMQ behavior yet.                                          |
+| DEC-006 | 2026-06-21 | Use BullMQ with stable job IDs and capped custom backoff for Phase 4.  | Matches requested queue/worker stack and keeps retry policy configurable from local env.        | BullMQ rejects `:` in custom IDs, so job IDs use `delivery-<eventId>`. |
+| DEC-007 | 2026-06-21 | Keep downstream delivery payload-driven and local-only.                | Demonstrates success, retry, permanent failure, and dead-letter behavior without external APIs. | Real provider delivery remains deferred.                               |
+| DEC-008 | 2026-06-21 | Keep Phase 5 dashboard server-rendered and local-demo unauthenticated. | Matches phase constraints and avoids frontend framework/auth scope creep.                       | Do not expose the dashboard publicly without later auth hardening.     |
 
 ## 12. Open questions
 
@@ -316,15 +366,15 @@
 
 ## 13. Next 3 actions
 
-1. User: Review Phase 4 validation summary — expected result: Phase 4 accepted as complete.
-2. User: Commit manually when ready — expected result: Phase 4 queue/worker behavior captured in Git history.
-3. User/Codex: Plan the next phase — expected result: dashboard, simulator, or replay scope remains explicitly phase-gated.
+1. User: Review Phase 5 validation summary — expected result: Phase 5 accepted as complete.
+2. User: Commit manually when ready — expected result: dashboard/manual replay behavior captured in Git history.
+3. User/Codex: Choose the next phase — expected result: simulator, deployment, or provider scope remains explicitly phase-gated.
 
 ## 14. Handoff notes
 
 - Start here next: `TASK-001`
-- Read first: `README.md`, `packages/queue/src/index.ts`, `apps/worker/src/worker.ts`, `apps/worker/src/delivery-processor.ts`, and `apps/api/src/services/ingest-webhook.ts`
+- Read first: `README.md`, `apps/api/src/dashboard/routes.ts`, `packages/db/src/repositories/dashboard.ts`, `packages/queue/src/delivery-job.ts`, and `apps/worker/src/delivery-processor.ts`
 - Commands to run first for next-phase setup check: `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test -- --run`
 - Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior outside the approved phase.
 - Watch for: next-phase scope creep and any request that would introduce real provider credentials, paid API usage, provider SDKs, or deployment automation before those are approved.
-- Suggested next prompt: `Start the next phase after reviewing Phase 4 validation and choosing dashboard, simulator, or replay scope.`
+- Suggested next prompt: `Start the next phase after reviewing Phase 5 validation and choosing simulator, demo script, or hardening scope.`

@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { DatabaseClient } from "../src/client.js";
 import {
+  createDashboardRepository,
   createDeadLetterEventsRepository,
   createDeliveryAttemptsRepository,
   createManualReplaysRepository,
@@ -37,6 +38,31 @@ const createPersistedEvent = async (externalEventId = "evt_repo_base"): Promise<
     createdAt: new Date("2026-06-20T12:00:00.000Z"),
     updatedAt: new Date("2026-06-20T12:00:00.000Z")
   });
+};
+
+const createPersistedEventWithStatus = async (
+  externalEventId: string,
+  currentStatus: WebhookEvent["currentStatus"],
+  receivedAt: Date,
+  lastSuccessfulAt: Date | null = null
+): Promise<WebhookEvent> => {
+  const repository = createWebhookEventRepository(client.db);
+  const result = await repository.createWithInitialStatusHistory({
+    normalizedEvent: createNormalizedEventFixture({
+      externalEventId,
+      receivedAt
+    }),
+    currentStatus,
+    lastSuccessfulAt,
+    createdAt: receivedAt,
+    updatedAt: receivedAt,
+    initialHistory: {
+      reasonCode: "dashboard_test_seed",
+      createdAt: receivedAt
+    }
+  });
+
+  return result.event;
 };
 
 beforeAll(() => {
@@ -355,6 +381,237 @@ describe("manual replays", () => {
     expect(updated.status).toBe("completed");
     expect(updated.replayedEventId).toBe(replayed.id);
     expect(await repository.listReplaysForOriginalEvent(original.id)).toEqual([updated]);
+  });
+});
+
+describe("dashboard repository", () => {
+  it("returns safe empty summary metrics for an empty database", async () => {
+    const dashboard = createDashboardRepository(client.db);
+
+    await expect(dashboard.getDashboardSummary()).resolves.toEqual({
+      totalEventVolume: 0,
+      successRate: 0,
+      failedEvents: 0,
+      retryCount: 0,
+      deadLetterCount: 0,
+      lastSuccessfulEvent: null
+    });
+  });
+
+  it("computes summary metrics from events, attempts, and dead-letter rows", async () => {
+    const attempts = createDeliveryAttemptsRepository(client.db);
+    const deadLetters = createDeadLetterEventsRepository(client.db);
+    const dashboard = createDashboardRepository(client.db);
+    const delivered = await createPersistedEventWithStatus(
+      "dashboard-delivered",
+      "delivered",
+      new Date("2026-06-20T12:00:00.000Z"),
+      new Date("2026-06-20T12:00:05.000Z")
+    );
+    await createPersistedEventWithStatus(
+      "dashboard-queued",
+      "queued",
+      new Date("2026-06-20T12:01:00.000Z")
+    );
+    const failed = await createPersistedEventWithStatus(
+      "dashboard-failed",
+      "failed_retryable",
+      new Date("2026-06-20T12:02:00.000Z")
+    );
+    const deadLettered = await createPersistedEventWithStatus(
+      "dashboard-dead",
+      "dead_lettered",
+      new Date("2026-06-20T12:03:00.000Z")
+    );
+    await createPersistedEventWithStatus(
+      "dashboard-rejected",
+      "rejected_invalid_signature",
+      new Date("2026-06-20T12:04:00.000Z")
+    );
+
+    await attempts.createDeliveryAttempt({
+      eventId: delivered.id,
+      attemptNumber: 1,
+      status: "succeeded"
+    });
+    await attempts.createDeliveryAttempt({
+      eventId: failed.id,
+      attemptNumber: 1,
+      status: "failed_retryable"
+    });
+    await attempts.createDeliveryAttempt({
+      eventId: failed.id,
+      attemptNumber: 2,
+      status: "failed_retryable"
+    });
+    await attempts.createDeliveryAttempt({
+      eventId: deadLettered.id,
+      attemptNumber: 1,
+      status: "failed_retryable"
+    });
+    await attempts.createDeliveryAttempt({
+      eventId: deadLettered.id,
+      attemptNumber: 2,
+      status: "failed_retryable"
+    });
+    await attempts.createDeliveryAttempt({
+      eventId: deadLettered.id,
+      attemptNumber: 3,
+      status: "failed_retryable"
+    });
+    await deadLetters.createDeadLetterEvent({
+      eventId: deadLettered.id,
+      reasonCode: "max_attempts_exhausted",
+      finalAttemptNumber: 3,
+      deadLetteredAt: new Date("2026-06-20T12:05:00.000Z")
+    });
+
+    const summary = await dashboard.getDashboardSummary();
+
+    expect(summary).toMatchObject({
+      totalEventVolume: 5,
+      successRate: 0.25,
+      failedEvents: 2,
+      retryCount: 3,
+      deadLetterCount: 1
+    });
+    expect(summary.lastSuccessfulEvent).toMatchObject({
+      id: delivered.id,
+      currentStatus: "delivered"
+    });
+  });
+
+  it("lists dashboard events with status filtering and omits raw payloads", async () => {
+    const dashboard = createDashboardRepository(client.db);
+    const newest = await createPersistedEventWithStatus(
+      "dashboard-list-newest",
+      "dead_lettered",
+      new Date("2026-06-20T12:10:00.000Z")
+    );
+    await createPersistedEventWithStatus(
+      "dashboard-list-oldest",
+      "delivered",
+      new Date("2026-06-20T12:00:00.000Z")
+    );
+
+    const allEvents = await dashboard.listDashboardEvents();
+    const deadLetteredEvents = await dashboard.listDashboardEvents({ status: "dead_lettered" });
+
+    expect(allEvents[0]?.id).toBe(newest.id);
+    expect(deadLetteredEvents).toHaveLength(1);
+    expect(deadLetteredEvents[0]).toMatchObject({
+      id: newest.id,
+      currentStatus: "dead_lettered"
+    });
+    expect(deadLetteredEvents[0]).not.toHaveProperty("payload");
+  });
+
+  it("returns event details, dead-letter rows, replay audits, and replay eligibility", async () => {
+    const attempts = createDeliveryAttemptsRepository(client.db);
+    const deadLetters = createDeadLetterEventsRepository(client.db);
+    const manualReplays = createManualReplaysRepository(client.db);
+    const dashboard = createDashboardRepository(client.db);
+    const event = await createPersistedEventWithStatus(
+      "dashboard-detail",
+      "dead_lettered",
+      new Date("2026-06-20T12:00:00.000Z")
+    );
+
+    await attempts.createDeliveryAttempt({
+      eventId: event.id,
+      attemptNumber: 1,
+      status: "failed_retryable",
+      errorCode: "MOCK_DOWNSTREAM_RETRYABLE"
+    });
+    await deadLetters.createDeadLetterEvent({
+      eventId: event.id,
+      reasonCode: "max_attempts_exhausted",
+      finalAttemptNumber: 1,
+      deadLetteredAt: new Date("2026-06-20T12:01:00.000Z")
+    });
+    await manualReplays.createManualReplay({
+      originalEventId: event.id,
+      requestedBy: "local-operator",
+      status: "queued",
+      requestedAt: new Date("2026-06-20T12:02:00.000Z")
+    });
+
+    const detail = await dashboard.getEventDetail(event.id);
+    const deadLetterList = await dashboard.listDashboardDeadLetters();
+
+    expect(detail?.event).toMatchObject({
+      id: event.id,
+      currentStatus: "dead_lettered"
+    });
+    expect(detail?.event).not.toHaveProperty("payload");
+    expect(detail?.statusHistory).toHaveLength(1);
+    expect(detail?.deliveryAttempts).toHaveLength(1);
+    expect(detail?.deadLetterEvent).toMatchObject({
+      reasonCode: "max_attempts_exhausted"
+    });
+    expect(detail?.manualReplays).toHaveLength(1);
+    expect(detail?.replayEligibility).toMatchObject({
+      replayable: true
+    });
+    expect(deadLetterList).toHaveLength(1);
+    expect(deadLetterList[0]).toMatchObject({
+      eventId: event.id,
+      isReplayable: true
+    });
+  });
+
+  it("creates a manual replay request with replay history and continued attempt number", async () => {
+    const attempts = createDeliveryAttemptsRepository(client.db);
+    const dashboard = createDashboardRepository(client.db);
+    const event = await createPersistedEventWithStatus(
+      "dashboard-replay-request",
+      "dead_lettered",
+      new Date("2026-06-20T12:00:00.000Z")
+    );
+
+    await attempts.createDeliveryAttempt({
+      eventId: event.id,
+      attemptNumber: 3,
+      status: "failed_retryable"
+    });
+
+    const replay = await dashboard.createManualReplayRequest({
+      eventId: event.id,
+      requestedBy: "local-operator",
+      reason: "Retry after local fix.",
+      requestedAt: new Date("2026-06-20T12:03:00.000Z")
+    });
+    const queued = await dashboard.markManualReplayQueued({
+      replayId: replay.manualReplay.id,
+      queueJobId: "delivery-replay-test",
+      queuedAt: new Date("2026-06-20T12:03:01.000Z")
+    });
+    const detail = await dashboard.getEventDetail(event.id);
+
+    expect(replay.initialAttemptNumber).toBe(4);
+    expect(queued.status).toBe("queued");
+    expect(detail?.statusHistory.map((entry) => entry.toStatus)).toContain("replayed");
+    expect(detail?.manualReplays[0]).toMatchObject({
+      id: replay.manualReplay.id,
+      status: "queued"
+    });
+  });
+
+  it("rejects replay creation for non-replayable statuses", async () => {
+    const dashboard = createDashboardRepository(client.db);
+    const event = await createPersistedEventWithStatus(
+      "dashboard-replay-blocked",
+      "delivered",
+      new Date("2026-06-20T12:00:00.000Z"),
+      new Date("2026-06-20T12:00:01.000Z")
+    );
+
+    await expect(
+      dashboard.createManualReplayRequest({
+        eventId: event.id,
+        requestedBy: "local-operator"
+      })
+    ).rejects.toThrow(/Manual replay is not allowed/);
   });
 });
 

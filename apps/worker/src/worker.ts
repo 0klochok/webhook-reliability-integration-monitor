@@ -1,6 +1,7 @@
 import {
   createDeadLetterEventsRepository,
   createDeliveryAttemptsRepository,
+  createManualReplaysRepository,
   createWebhookEventRepository,
   type DatabaseClient
 } from "@webhook-monitor/db";
@@ -38,6 +39,7 @@ export const createDeliveryWorkerRuntime = (
     webhookEvents: createWebhookEventRepository(input.database.db),
     deliveryAttempts: createDeliveryAttemptsRepository(input.database.db),
     deadLetterEvents: createDeadLetterEventsRepository(input.database.db),
+    manualReplays: createManualReplaysRepository(input.database.db),
     downstreamClient: createPayloadDrivenMockDownstreamClient(),
     retryPolicy: input.config.retryPolicy,
     targetUrl: input.config.mockDownstreamUrl

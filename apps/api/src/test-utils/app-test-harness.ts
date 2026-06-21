@@ -1,5 +1,13 @@
-import { createWebhookEventRepository, type DatabaseClient } from "@webhook-monitor/db";
-import type { DeliveryQueuePort, EnqueueDeliveryInput } from "@webhook-monitor/queue";
+import {
+  createDashboardRepository,
+  createWebhookEventRepository,
+  type DatabaseClient
+} from "@webhook-monitor/db";
+import {
+  createDeliveryQueueJobId,
+  type DeliveryQueuePort,
+  type EnqueueDeliveryInput
+} from "@webhook-monitor/queue";
 
 import { createApp } from "../app.js";
 import type { ApiConfig } from "../config.js";
@@ -43,7 +51,7 @@ export const createRecordingDeliveryQueue = (): RecordingDeliveryQueue => {
 
       return {
         queued: true,
-        queueJobId: `delivery-${input.eventId}`
+        queueJobId: createDeliveryQueueJobId(input)
       };
     }
   };
@@ -61,6 +69,7 @@ export const createApiTestHarness = (input: CreateApiTestHarnessInput) => {
     app: createApp({
       config,
       webhookEvents,
+      dashboard: createDashboardRepository(input.client.db),
       deliveryQueue,
       clock: input.clock
     }),

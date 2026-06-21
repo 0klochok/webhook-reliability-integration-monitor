@@ -8,6 +8,9 @@ export type ApiErrorCode =
   | "persistence_error"
   | "queue_enqueue_failed"
   | "misconfigured_signature_secret"
+  | "invalid_event_id"
+  | "invalid_status_filter"
+  | "replay_not_allowed"
   | "not_found"
   | "internal_error";
 

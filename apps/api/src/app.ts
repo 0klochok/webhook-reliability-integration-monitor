@@ -1,13 +1,15 @@
 import { Hono } from "hono";
 
 import type { ApiConfig } from "./config.js";
+import { registerDashboardRoutes, type DashboardRouteDependencies } from "./dashboard/routes.js";
 import { ApiError, toApiError } from "./errors.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 import { createErrorResponse } from "./services/response-shapes.js";
 import type { IngestWebhookDependencies } from "./services/ingest-webhook.js";
 
-export interface CreateAppDependencies extends IngestWebhookDependencies {
+export interface CreateAppDependencies
+  extends IngestWebhookDependencies, DashboardRouteDependencies {
   readonly config: ApiConfig;
 }
 
@@ -46,6 +48,7 @@ export const createApp = (dependencies: CreateAppDependencies): Hono => {
 
   registerHealthRoutes(app, dependencies.config);
   registerWebhookRoutes(app, dependencies);
+  registerDashboardRoutes(app, dependencies);
 
   return app;
 };

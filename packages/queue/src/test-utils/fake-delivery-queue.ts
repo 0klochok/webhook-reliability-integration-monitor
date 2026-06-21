@@ -1,5 +1,5 @@
 import {
-  createDeliveryJobId,
+  createDeliveryQueueJobId,
   type DeliveryQueuePort,
   type EnqueueDeliveryInput,
   type EnqueueDeliveryResult
@@ -30,7 +30,7 @@ export const createFakeDeliveryQueue = (): FakeDeliveryQueue => {
 
       return {
         queued: true,
-        queueJobId: createDeliveryJobId(input.eventId)
+        queueJobId: createDeliveryQueueJobId(input)
       };
     }
   };

@@ -13,6 +13,7 @@ import {
 import {
   createDeadLetterEventsRepository,
   createDeliveryAttemptsRepository,
+  createManualReplaysRepository,
   createWebhookEventRepository,
   type DatabaseClient,
   type WebhookEvent
@@ -108,6 +109,7 @@ const createQueueWorkerPair = async () => {
     webhookEvents: createWebhookEventRepository(client.db),
     deliveryAttempts: createDeliveryAttemptsRepository(client.db),
     deadLetterEvents: createDeadLetterEventsRepository(client.db),
+    manualReplays: createManualReplaysRepository(client.db),
     downstreamClient: createPayloadDrivenMockDownstreamClient(),
     retryPolicy,
     targetUrl: "http://localhost:3000/mock-downstream/deliver"

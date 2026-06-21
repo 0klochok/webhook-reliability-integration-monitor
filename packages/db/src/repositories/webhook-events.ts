@@ -213,6 +213,57 @@ export const createWebhookEventRepository = (db: Database) => {
       return { inserted: false, event: existingEvent };
     },
 
+    createIdempotentWithInitialStatusHistory: async (
+      input: CreateWebhookEventWithInitialStatusInput
+    ): Promise<IdempotentCreateWebhookEventResult> =>
+      db.transaction(async (tx) => {
+        const [insertedEvent] = await tx
+          .insert(webhookEvents)
+          .values(toWebhookEventInsert(input))
+          .onConflictDoNothing({
+            target: [webhookEvents.providerId, webhookEvents.externalEventId]
+          })
+          .returning();
+
+        if (insertedEvent) {
+          const [history] = await tx
+            .insert(eventStatusHistory)
+            .values({
+              eventId: insertedEvent.id,
+              fromStatus: null,
+              toStatus: insertedEvent.currentStatus,
+              reasonCode: input.initialHistory?.reasonCode ?? null,
+              message: input.initialHistory?.message ?? null,
+              metadata: input.initialHistory?.metadata,
+              createdAt: input.initialHistory?.createdAt ?? insertedEvent.createdAt
+            })
+            .returning();
+
+          if (!history) {
+            throw new Error("Failed to create initial event status history.");
+          }
+
+          return { inserted: true, event: insertedEvent };
+        }
+
+        const [existingEvent] = await tx
+          .select()
+          .from(webhookEvents)
+          .where(
+            and(
+              eq(webhookEvents.providerId, input.normalizedEvent.providerId),
+              eq(webhookEvents.externalEventId, input.normalizedEvent.externalEventId)
+            )
+          )
+          .limit(1);
+
+        if (!existingEvent) {
+          throw new Error("Idempotent create conflict occurred but no existing event was found.");
+        }
+
+        return { inserted: false, event: existingEvent };
+      }),
+
     getById,
 
     getByProviderAndExternalEventId,

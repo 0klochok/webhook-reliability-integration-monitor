@@ -2,5 +2,20 @@
   "name": "@webhook-monitor/api",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "test": "vitest run test",
+    "typecheck": "tsc -b ../../tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.8",
+    "@webhook-monitor/core": "workspace:*",
+    "@webhook-monitor/db": "workspace:*",
+    "@webhook-monitor/queue": "workspace:*",
+    "hono": "^4.11.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.22.4"
+  }
 }

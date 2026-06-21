@@ -12,8 +12,17 @@ worker, HTTP ingress, dashboard, simulator behavior, real provider API usage, or
 Phase 2 adds PostgreSQL-backed persistence in `packages/db` with Drizzle schema and migrations,
 repository-layer behavior, idempotent event storage, status history, delivery attempts,
 dead-letter records, manual replay audit records, local reset/seed scripts, and integration tests
-against local PostgreSQL. There is still no HTTP ingress, Hono route, queue behavior, worker,
-dashboard, simulator behavior, real provider API usage, or real credentials.
+against local PostgreSQL. At the end of Phase 2 there was still no HTTP ingress, Hono route, queue
+behavior, worker, dashboard, simulator behavior, real provider API usage, or real credentials.
+
+Phase 3 adds a local Hono webhook ingress API in `apps/api`: `GET /healthz` and
+`POST /webhooks/:provider` for `stripe-sample`, `generic-http`, and `mock-crm`. The ingress reads
+the raw request body before parsing JSON, verifies fake/local Stripe-style HMAC signatures for
+`stripe-sample`, validates payloads with the Phase 1 Zod adapters, persists accepted and rejected
+events through the Phase 2 database repositories, enforces provider/external-event idempotency, and
+calls a dependency-injected delivery queue placeholder only for newly accepted events. Phase 3 does
+not add BullMQ, Redis queue behavior, worker processing, retry execution, dashboard pages,
+simulator commands, real provider APIs, or provider SDKs.
 
 ## Problem Statement
 
@@ -110,6 +119,110 @@ git status --short
 
 `pnpm format:check` is also part of the repository quality gate. `pnpm db:studio` is available for
 manual inspection, but it is not a blocking validation command because it may keep a process open.
+
+## Phase 3 Webhook Ingress API
+
+Run the API locally after starting Postgres and applying migrations:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
+pnpm install
+pnpm db:migrate
+pnpm dev:api
+```
+
+`pnpm dev:api` is a long-running local server command. In another PowerShell session, send a valid
+generic webhook:
+
+```powershell
+$genericBody = @{
+  eventId = "generic-manual-1"
+  eventType = "order.fulfilled"
+  occurredAt = "2026-06-20T12:00:00.000Z"
+  source = "manual-local"
+  idempotencyKey = "generic-manual-1"
+  payload = @{
+    orderId = "order_manual_123"
+    total = 2499
+    currency = "usd"
+  }
+} | ConvertTo-Json -Depth 6 -Compress
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:3000/webhooks/generic-http" `
+  -ContentType "application/json" `
+  -Body $genericBody
+```
+
+Send the same `$genericBody` again to verify the duplicate response. Send an invalid payload:
+
+```powershell
+$invalidBody = @{
+  eventId = "generic-invalid-manual-1"
+  occurredAt = "2026-06-20T12:00:00.000Z"
+  payload = @{}
+} | ConvertTo-Json -Depth 4 -Compress
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:3000/webhooks/generic-http" `
+  -ContentType "application/json" `
+  -Body $invalidBody
+```
+
+Send a signed fake/local Stripe-style webhook:
+
+```powershell
+$timestamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+$stripeBody = @{
+  id = "evt_manual_payment_succeeded"
+  object = "event"
+  type = "payment_intent.succeeded"
+  created = $timestamp
+  livemode = $false
+  data = @{
+    object = @{
+      id = "pi_manual_123"
+      object = "payment_intent"
+      amount = 2499
+      currency = "usd"
+    }
+  }
+} | ConvertTo-Json -Depth 8 -Compress
+
+$secret = "whsec_local_test_secret"
+$hmac = [System.Security.Cryptography.HMACSHA256]::new(
+  [System.Text.Encoding]::UTF8.GetBytes($secret)
+)
+$signatureBytes = $hmac.ComputeHash(
+  [System.Text.Encoding]::UTF8.GetBytes("${timestamp}.${stripeBody}")
+)
+$signature = -join ($signatureBytes | ForEach-Object { $_.ToString("x2") })
+$hmac.Dispose()
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:3000/webhooks/stripe-sample" `
+  -ContentType "application/json" `
+  -Headers @{ "stripe-signature" = "t=$timestamp,v1=$signature" } `
+  -Body $stripeBody
+```
+
+Send the same `$stripeBody` with `-Headers @{ "stripe-signature" = "t=$timestamp,v1=deadbeef" }`
+to verify invalid-signature rejection and persisted audit history.
+
+Phase 3 validation commands:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
+pnpm install
+pnpm db:migrate
+pnpm test -- --run
+pnpm lint
+pnpm typecheck
+git status --short
+```
 
 ## Phase 0 Validation Commands
 

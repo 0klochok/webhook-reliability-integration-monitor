@@ -1,452 +1,289 @@
-# webhook-reliability-integration-monitor
+# Webhook Reliability Integration Monitor
 
-A local-first TypeScript portfolio project for demonstrating reliable webhook ingestion,
-idempotent processing, retry handling, dead-letter recovery, and integration health monitoring.
+A lightweight local middleware service that receives webhook events, validates payloads, verifies
+fake Stripe-style signatures, stores event history, prevents duplicate processing, retries failed
+deliveries, dead-letters unrecoverable events, and exposes a local server-rendered health dashboard.
 
-Phase 1 defines pure core domain contracts in `packages/core`: provider IDs and metadata for
-`stripe-sample`, `generic-http`, and `mock-crm`; Zod validation schemas for local sample payloads;
-a provider-independent normalized event contract; retry policy helpers; provider adapters; and
-fake/local-only Stripe-style HMAC signature verification. Phase 1 did not add database, queue,
-worker, HTTP ingress, dashboard, simulator behavior, real provider API usage, or real credentials.
+This is a portfolio project for business automation reliability. It demonstrates production-style
+webhook patterns locally without real provider credentials, paid APIs, public tunnels, deployment, or
+provider SDKs.
 
-Phase 2 adds PostgreSQL-backed persistence in `packages/db` with Drizzle schema and migrations,
-repository-layer behavior, idempotent event storage, status history, delivery attempts,
-dead-letter records, manual replay audit records, local reset/seed scripts, and integration tests
-against local PostgreSQL. At the end of Phase 2 there was still no HTTP ingress, Hono route, queue
-behavior, worker, dashboard, simulator behavior, real provider API usage, or real credentials.
+## Client Problem
 
-Phase 3 adds a local Hono webhook ingress API in `apps/api`: `GET /healthz` and
-`POST /webhooks/:provider` for `stripe-sample`, `generic-http`, and `mock-crm`. The ingress reads
-the raw request body before parsing JSON, verifies fake/local Stripe-style HMAC signatures for
-`stripe-sample`, validates payloads with the Phase 1 Zod adapters, persists accepted and rejected
-events through the Phase 2 database repositories, enforces provider/external-event idempotency, and
-calls a dependency-injected delivery queue placeholder only for newly accepted events. Phase 3 does
-not add BullMQ, Redis queue behavior, worker processing, retry execution, dashboard pages,
-simulator commands, real provider APIs, or provider SDKs.
+Webhook-based automations often fail silently. A SaaS operator may depend on payment, CRM,
+scheduling, commerce, and support webhooks, but those systems can send bad or repeated events, time
+out during delivery, or fail while a downstream system is unavailable.
 
-Phase 4 replaces the queue placeholder with BullMQ-backed delivery jobs in `packages/queue` and
-adds `apps/worker` for local mock downstream processing. The worker records delivery attempts,
-updates event status history, retries retryable failures with capped exponential backoff, marks
-successful events as delivered, and creates dead-letter records after retry exhaustion or permanent
-mock failures. Phase 4 still does not add dashboard pages, manual replay UI, simulator commands,
-provider SDKs, real provider calls, paid API usage, GitHub Actions, or app containers.
+Common failure modes:
 
-Phase 5 adds a local Hono-rendered dashboard and manual replay flow. The dashboard shows integration
-health metrics, recent events, status filtering, event details, delivery attempts, dead-letter
-records, and manual replay audit records. Manual replay is local-demo only: eligible failed or
-dead-lettered events create a `manual_replays` audit row, enqueue a replay-specific BullMQ job, and
-let the worker process the event without weakening normal webhook idempotency. Phase 5 still does
-not add simulator commands, frontend frameworks, provider SDKs, real provider calls, paid API usage,
-GitHub Actions, deployment, or production authentication.
+- Duplicate events
+- Invalid payloads
+- Invalid signatures
+- Timeouts
+- Downstream API outages
+- Expired credentials
+- Missing retry visibility
 
-Phase 6 adds a repeatable local webhook simulator in `tools/simulator`. The simulator sends fake
-provider payloads to the local Hono API, signs Stripe-style sample events with a fake local secret,
-demonstrates duplicate prevention, validation failures, retry success, retry exhaustion,
-permanent-failure dead-lettering, and JSON-route manual replay. Phase 6 still does not add provider
-SDKs, real provider calls, paid API usage, public tunnels, GitHub Actions, deployment, Next.js,
-React, or production authentication.
+Business impact:
 
-## Problem Statement
+- Lost orders
+- Stale CRM records
+- Missed notifications
+- Broken billing workflows
+- Manual reconciliation work
 
-Business automations often depend on webhooks from payment providers, CRMs, scheduling tools, and
-commerce platforms. Those events can arrive late, arrive more than once, fail signature validation,
-or fail downstream delivery. A reliable webhook integration needs durable storage, idempotency,
-retries, dead-letter handling, and operational visibility.
+## Why Reliable Webhook Handling Matters For Business Automations
 
-## Why Reliable Webhook Handling Matters for Business Automations
+Business automations depend on external systems that are outside the operator's direct control. A
+payment event, CRM update, booking notification, or fulfillment signal may be valid, duplicated,
+malformed, late, or temporarily undeliverable. Reliable webhook middleware turns those uncertain
+inputs into an auditable workflow: validate trust, preserve history, process idempotently, retry
+temporary failures, dead-letter unrecoverable events, and give operators a dashboard for recovery.
 
-When webhook processing is unreliable, teams can miss paid invoices, duplicate customer updates,
-lose fulfillment signals, or silently break revenue and support workflows. This project is planned
-as a local demo of the safeguards that make webhook-driven automations observable and recoverable
-before they are connected to real providers.
+## Fake Client Scenario
 
-## Planned Architecture
+Client: SaaS operator with several webhook-based integrations.
+
+Problem: Webhook events are sometimes duplicated or fail silently. The team has no clear retry
+mechanism, no event history, and no dashboard for integration health.
+
+Solution: A webhook middleware and health monitor that makes integrations observable and retryable
+before events are handed to downstream business systems.
+
+## What This Project Demonstrates
+
+- Production-style webhook ingestion
+- Zod payload validation
+- Stripe-style HMAC signature verification in fake/local mode
+- Idempotency handling by provider and external event ID
+- PostgreSQL event history
+- BullMQ/Redis retry queue
+- Worker-based downstream processing
+- Exponential retry/backoff
+- Dead-letter handling
+- Manual replay
+- Server-rendered health dashboard
+- Local webhook simulator
+- Environment validation
+- Structured logging
+- Correlation IDs
+- Readiness checks
+- Payload-size limits
+- In-memory local rate limiting
+- Safe error responses
+- Secret redaction
+
+## Architecture
+
+The API accepts webhook requests through Hono, verifies provider-specific trust requirements, parses
+and validates payloads with Zod, stores every accepted or rejected event in PostgreSQL, and enqueues
+new accepted events to BullMQ. The worker consumes delivery jobs from Redis, uses a payload-driven
+local mock downstream client, records delivery attempts, retries retryable failures, creates
+dead-letter records, and lets the dashboard read health state from PostgreSQL.
 
 ```mermaid
 flowchart LR
-  Provider[Provider webhook] --> Ingress[Hono ingress]
-  Ingress --> Adapter[Provider adapter]
-  Adapter --> Verify[Raw-body signature verification]
-  Verify --> Validate[Zod payload validation]
-  Validate --> Idempotency[Idempotency check]
-  Idempotency --> Store[PostgreSQL event/history storage]
-  Store --> Queue[BullMQ queue]
-  Queue --> Worker[Worker downstream delivery]
-  Worker --> Retry[Retry/backoff]
-  Retry --> DeadLetter[Dead-letter list]
-  DeadLetter --> Replay[Manual replay]
-  Store --> Dashboard[Dashboard health view]
+  Provider[Provider webhook] --> Ingress[Hono webhook ingress]
+  Ingress --> Signature[Signature verification]
+  Signature --> Validation[Zod validation]
+  Validation --> Idempotency[Idempotency check]
+  Idempotency --> Database[(PostgreSQL event history)]
+  Idempotency --> Queue[BullMQ delivery queue]
+  Queue --> Worker[Worker retry processor]
+  Worker --> Target[Payload-driven mock downstream target]
+  Worker --> Database
+  Database --> Dashboard[Health dashboard]
+  Dashboard --> Replay[Manual replay]
+  Replay --> Queue
 ```
 
-Planned repository shape:
+Plain-text flow:
 
 ```text
-apps/api        Hono API, webhook ingress, dashboard, health endpoints
-apps/worker     BullMQ worker and retry processing
-packages/core   provider contracts, schemas, signatures, idempotency/status model
-packages/db     Drizzle schema, migrations, repository layer
-packages/queue  queue names, job contracts, enqueue helpers, retry policy
-tools/simulator local demo/simulator commands
-infra           Docker Compose and local infrastructure files
-docs            architecture notes, demo script, manual verification notes
+provider webhook -> ingress -> validation -> queue -> worker -> mock target -> dashboard
 ```
 
-## Local Prerequisites
+Detailed lifecycle notes are in [docs/architecture.md](docs/architecture.md).
 
-- Windows 11 Pro with PowerShell
-- Node.js `v24.16.0` or newer compatible version
-- pnpm `11.7.0`
-- Docker Desktop with Docker Compose
+## Repository Structure
 
-## Setup
+```text
+apps/api         Hono API, webhook ingress, health/readiness routes, dashboard HTML and JSON routes
+apps/worker      BullMQ worker runtime, retry processing, mock downstream delivery simulation
+packages/core    Provider contracts, Zod schemas, status model, retry policy, signatures, logging
+packages/db      Drizzle schema, migrations, database client, repositories, reset/seed scripts
+packages/queue   Queue names, delivery job contracts, Redis helpers, BullMQ enqueue/worker helpers
+tools/simulator  Local webhook simulator scenarios and fake provider payloads
+infra            Docker Compose services for local PostgreSQL and Redis
+docs             Architecture, demo, failure scenarios, screenshots, verification, troubleshooting
+```
+
+## Tech Stack
+
+- Node.js
+- TypeScript
+- pnpm workspaces
+- Hono
+- Zod
+- PostgreSQL
+- Redis
+- BullMQ
+- Drizzle ORM and Drizzle Kit
+- Vitest
+- Docker Compose
+- PowerShell-friendly local workflow
+
+## Prerequisites
+
+- Windows 11 Pro
+- PowerShell
+- Node.js `24.16.0` or newer
+- pnpm `11.7.0` or newer, through Corepack or an installed pnpm
+- Docker Desktop
+- Git
+- VS Code, optional
+
+Check local tooling:
 
 ```powershell
+node --version
+pnpm --version
+docker --version
+docker compose version
+git --version
+```
+
+## Local Setup
+
+Run from the project root:
+
+```powershell
+Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
 pnpm install
-```
-
-`.env.example` contains fake local-only values only. Use those exact values for local manual
-verification unless you intentionally changed the Docker Compose credentials and volumes.
-
-PowerShell environment variables are process-local. Set them in every terminal that starts a
-project command; setting them in one terminal does not update an already-running API/worker process
-or another terminal.
-
-Common local values:
-
-```powershell
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
-```
-
-For runtime verification, start Docker PostgreSQL and Redis first, set the env vars in the current
-terminal, and run migrations before starting the API, worker, or simulator:
-
-```powershell
+Copy-Item .env.example .env
 docker compose -f .\infra\docker-compose.yml up -d postgres redis
-docker compose -f .\infra\docker-compose.yml ps
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
 pnpm db:migrate
 ```
 
-API terminals require `DATABASE_URL`, `REDIS_URL`, and `STRIPE_SAMPLE_WEBHOOK_SECRET` for simulator
-and Stripe-style webhook verification. Worker terminals require `DATABASE_URL` and `REDIS_URL`.
-Simulator terminals should use the same fake `STRIPE_SAMPLE_WEBHOOK_SECRET`, and the API must be
-running with that value already loaded. Restart `pnpm dev:api` after changing any API environment
-variable.
+The API, worker, database scripts, queue reset script, and simulator read `.env` when present. Local
+development commands also fall back to `.env.example` for fake local values, but copying `.env` makes
+the workflow explicit and closer to a clean-clone setup.
 
-## Phase 2 Local Database
+## Environment Variables
 
-Phase 2 stores canonical webhook state in PostgreSQL through Drizzle. The generated migration
-creates these tables:
+`.env.example` contains fake local-only values. No real provider credentials are required.
 
-- `webhook_events`
-- `event_status_history`
-- `delivery_attempts`
-- `dead_letter_events`
-- `manual_replays`
+Important values:
 
-The main idempotency guarantee is the unique database constraint on
-`(provider_id, external_event_id)` in `webhook_events`. Reset and seed scripts are local-only:
-they refuse destructive cleanup when `DATABASE_URL` does not point to a known local host and local
-demo/test database name. Seed data is fake and deterministic. Use `pnpm db:reset` when you need to
-truncate only application tables while preserving Drizzle migration metadata.
+- `DATABASE_URL` targets local Docker PostgreSQL.
+- `REDIS_URL` targets local Docker Redis.
+- `STRIPE_SAMPLE_WEBHOOK_SECRET` is a fake local signing secret for the sample Stripe-style provider.
+- `MOCK_DOWNSTREAM_MODE=payload-driven` tells the worker to simulate downstream behavior from the
+  event payload.
+- `SIMULATOR_API_BASE_URL=http://localhost:3000` points the simulator at the local API.
 
-Run Phase 2 commands from the repository root:
+Do not commit real secrets. `.env` is ignored by Git. Production deployment would need real secret
+management, authentication, authorization, TLS, and environment-specific configuration.
 
-```powershell
-docker compose -f .\infra\docker-compose.yml up -d postgres
-pnpm install
-pnpm db:generate
-pnpm db:migrate
-pnpm db:seed
-pnpm test -- --run
-pnpm lint
-pnpm typecheck
-docker compose -f .\infra\docker-compose.yml ps
-git status --short
-```
+## Database Commands
 
-`pnpm format:check` is also part of the repository quality gate. `pnpm db:studio` is available for
-manual inspection, but it is not a blocking validation command because it may keep a process open.
+Run these from the repository root:
 
-## Phase 3 Webhook Ingress API
+| Command            | What it does                                        | Safety                                             |
+| ------------------ | --------------------------------------------------- | -------------------------------------------------- |
+| `pnpm db:generate` | Generates Drizzle migrations from schema changes    | Development command; may create migration files    |
+| `pnpm db:migrate`  | Applies existing migrations to the configured DB    | Safe for local setup when `DATABASE_URL` is local  |
+| `pnpm db:reset`    | Truncates application tables, preserving migrations | Destructive local-only reset with DB target checks |
+| `pnpm db:seed`     | Resets and inserts fake deterministic demo data     | Destructive local-only seed                        |
+| `pnpm db:studio`   | Opens Drizzle Studio                                | Long-running inspection command                    |
+| `pnpm queue:reset` | Clears the local BullMQ delivery queue              | Destructive local-only Redis target checks         |
+| `pnpm demo:reset`  | Runs `db:reset` and `queue:reset`                   | Destructive local-only demo reset                  |
+| `pnpm demo:seed`   | Runs `db:seed`                                      | Destructive local-only demo seed                   |
 
-Run the API locally after starting Postgres and applying migrations:
+## Running The App Locally
+
+Use three PowerShell terminals.
+
+Terminal 1, API:
 
 ```powershell
-docker compose -f .\infra\docker-compose.yml up -d postgres redis
-pnpm install
-pnpm db:migrate
+Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
 pnpm dev:api
 ```
 
-`pnpm dev:api` is a long-running local server command. In another PowerShell session, send a valid
-generic webhook:
+Terminal 2, worker:
 
 ```powershell
-$genericBody = @{
-  eventId = "generic-manual-1"
-  eventType = "order.fulfilled"
-  occurredAt = "2026-06-20T12:00:00.000Z"
-  source = "manual-local"
-  idempotencyKey = "generic-manual-1"
-  payload = @{
-    orderId = "order_manual_123"
-    total = 2499
-    currency = "usd"
-  }
-} | ConvertTo-Json -Depth 6 -Compress
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:3000/webhooks/generic-http" `
-  -ContentType "application/json" `
-  -Body $genericBody
-```
-
-Send the same `$genericBody` again to verify the duplicate response. Send an invalid payload:
-
-```powershell
-$invalidBody = @{
-  eventId = "generic-invalid-manual-1"
-  occurredAt = "2026-06-20T12:00:00.000Z"
-  payload = @{}
-} | ConvertTo-Json -Depth 4 -Compress
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:3000/webhooks/generic-http" `
-  -ContentType "application/json" `
-  -Body $invalidBody
-```
-
-Send a signed fake/local Stripe-style webhook:
-
-```powershell
-$timestamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$stripeBody = @{
-  id = "evt_manual_payment_succeeded"
-  object = "event"
-  type = "payment_intent.succeeded"
-  created = $timestamp
-  livemode = $false
-  data = @{
-    object = @{
-      id = "pi_manual_123"
-      object = "payment_intent"
-      amount = 2499
-      currency = "usd"
-    }
-  }
-} | ConvertTo-Json -Depth 8 -Compress
-
-$secret = "whsec_local_test_secret"
-$hmac = [System.Security.Cryptography.HMACSHA256]::new(
-  [System.Text.Encoding]::UTF8.GetBytes($secret)
-)
-$signatureBytes = $hmac.ComputeHash(
-  [System.Text.Encoding]::UTF8.GetBytes("${timestamp}.${stripeBody}")
-)
-$signature = -join ($signatureBytes | ForEach-Object { $_.ToString("x2") })
-$hmac.Dispose()
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:3000/webhooks/stripe-sample" `
-  -ContentType "application/json" `
-  -Headers @{ "stripe-signature" = "t=$timestamp,v1=$signature" } `
-  -Body $stripeBody
-```
-
-Send the same `$stripeBody` with `-Headers @{ "stripe-signature" = "t=$timestamp,v1=deadbeef" }`
-to verify invalid-signature rejection and persisted audit history.
-
-Phase 3 validation commands:
-
-```powershell
-docker compose -f .\infra\docker-compose.yml up -d postgres redis
-pnpm install
-pnpm db:migrate
-pnpm test -- --run
-pnpm lint
-pnpm typecheck
-git status --short
-```
-
-## Phase 4 Queue, Worker, Retry, And Dead Letter
-
-Phase 4 requires local PostgreSQL and Redis. `packages/queue` owns the BullMQ queue named
-`webhook-delivery`, delivery job validation, stable job ids in the form `delivery-<eventId>`, Redis
-connection helpers, and capped exponential retry options. `apps/api` enqueues one delivery job for
-each newly accepted webhook event; duplicate events and rejected webhooks do not enqueue jobs.
-
-`apps/worker` consumes delivery jobs and calls a deterministic local mock downstream client. The
-mock behavior is controlled by `generic-http` payload fields such as
-`payload.deliveryBehavior`. Supported values are `success`, `fail-once-then-success`,
-`fail-twice-then-success`, `always-retryable-fail`, and `permanent-fail`.
-
-### Phase 4 local manual QA
-
-Start the local infrastructure, migrate the database, and run the API from the repository root:
-
-```powershell
-docker compose -f .\infra\docker-compose.yml up -d postgres redis
-pnpm db:migrate
-pnpm dev:api
-```
-
-`pnpm dev:api` is long-running. In a second PowerShell terminal, start the worker:
-
-```powershell
+Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
 pnpm dev:worker
 ```
 
-`pnpm dev:worker` is also long-running. In a third PowerShell terminal, send the manual QA
-webhooks. If you have already sent these exact event IDs, either change all three `eventId` and
-`idempotencyKey` values to new unique strings, or intentionally reset local app data first with the
-local-only `pnpm db:reset` command.
-
-Send a successful delivery scenario:
+Terminal 3, simulator:
 
 ```powershell
-$successBody = @{
-  eventId = "generic-phase4-success-1"
-  eventType = "order.fulfilled"
-  occurredAt = "2026-06-20T12:00:00.000Z"
-  source = "manual-local"
-  idempotencyKey = "generic-phase4-success-1"
-  payload = @{
-    orderId = "order_phase4_success_123"
-    deliveryBehavior = "success"
-  }
-} | ConvertTo-Json -Depth 6 -Compress
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:3000/webhooks/generic-http" `
-  -ContentType "application/json" `
-  -Body $successBody
+Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
+pnpm simulator:success
 ```
 
-Send a retry-then-success scenario. The payload shape matches the `generic-http` test fixture, with
-the mock worker behavior selected by `payload.deliveryBehavior`:
+`pnpm dev:api` and `pnpm dev:worker` are long-running commands. The default API URL is
+`http://localhost:3000`, and the default dashboard URL is `http://localhost:3000/dashboard`.
+
+The dashboard is local-demo only. Do not expose it publicly without adding production authentication,
+authorization, CSRF protection, and deployment hardening.
+
+## Health And Readiness
 
 ```powershell
-$retryBody = @{
-  eventId = "generic-phase4-retry-1"
-  eventType = "order.fulfilled"
-  occurredAt = "2026-06-20T12:00:00.000Z"
-  source = "manual-local"
-  idempotencyKey = "generic-phase4-retry-1"
-  payload = @{
-    orderId = "order_phase4_retry_123"
-    deliveryBehavior = "fail-once-then-success"
-  }
-} | ConvertTo-Json -Depth 6 -Compress
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:3000/webhooks/generic-http" `
-  -ContentType "application/json" `
-  -Body $retryBody
+Invoke-RestMethod -Method Get -Uri "http://localhost:3000/healthz"
+Invoke-RestMethod -Method Get -Uri "http://localhost:3000/readyz"
 ```
 
-Send a permanent-failure dead-letter scenario:
+- `GET /healthz`: process is alive.
+- `GET /readyz`: dependencies such as PostgreSQL and Redis are available.
 
-```powershell
-$deadLetterBody = @{
-  eventId = "generic-phase4-dead-letter-1"
-  eventType = "order.fulfilled"
-  occurredAt = "2026-06-20T12:00:00.000Z"
-  source = "manual-local"
-  idempotencyKey = "generic-phase4-dead-letter-1"
-  payload = @{
-    orderId = "order_phase4_dead_letter_123"
-    deliveryBehavior = "permanent-fail"
-  }
-} | ConvertTo-Json -Depth 6 -Compress
+`/readyz` returns `503` with safe dependency status when the database or queue dependency is
+unavailable.
 
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:3000/webhooks/generic-http" `
-  -ContentType "application/json" `
-  -Body $deadLetterBody
+## Webhook Endpoints
+
+The implemented route is:
+
+```text
+POST /webhooks/:provider
 ```
 
-To verify retry exhaustion instead of a permanent failure, send the same dead-letter payload with a
-new `eventId` / `idempotencyKey` and `deliveryBehavior = "always-retryable-fail"`. With the
-`.env.example` defaults, the worker uses three max attempts and schedules the first retry after about
-one second.
+Concrete local provider paths:
 
-After sending the webhooks, wait a few seconds for the worker to finish retry processing, then inspect
-the local database through the existing Postgres container:
+- `POST /webhooks/stripe-sample`
+- `POST /webhooks/generic-http`
+- `POST /webhooks/mock-crm`
 
-```powershell
-docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c "select external_event_id, current_status, last_successful_at from webhook_events where external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1') order by external_event_id;"
+Behavior:
 
-docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c "select e.external_event_id, a.attempt_number, a.status, a.http_status_code, a.error_code from delivery_attempts a join webhook_events e on e.id = a.event_id where e.external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1') order by e.external_event_id, a.attempt_number;"
+- `stripe-sample` requires a fake/local Stripe-style `stripe-signature` HMAC over the raw body.
+- `generic-http` validates a generic integration event shape.
+- `mock-crm` validates a sample CRM event shape.
+- Invalid signatures return `401`, persist `rejected_invalid_signature`, and do not enqueue.
+- Invalid JSON or invalid payloads return `400`, persist `rejected_invalid_payload`, and do not
+  enqueue.
+- Duplicate provider/external event IDs return success with duplicate handling and append
+  `duplicate_ignored` history without creating another delivery job.
+- Accepted new events record `received`, `validated`, and `queued` history, then the worker records
+  processing, retry, delivery, or dead-letter history.
 
-docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c "select e.external_event_id, h.from_status, h.to_status, h.reason_code from event_status_history h join webhook_events e on e.id = h.event_id where e.external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1') order by e.external_event_id, h.created_at;"
+No real Stripe, Shopify, Calendly, HubSpot, CRM, or paid provider APIs are called.
 
-$deadLetterSql = @"
-select e.external_event_id, d.reason_code, d.final_attempt_number
-from dead_letter_events d
-join webhook_events e on e.id = d.event_id
-where e.external_event_id in ('generic-phase4-success-1', 'generic-phase4-retry-1', 'generic-phase4-dead-letter-1')
-order by e.external_event_id;
-"@
+## Dashboard Routes
 
-docker compose -f .\infra\docker-compose.yml exec -T postgres psql -U webhook_monitor -d webhook_monitor -c $deadLetterSql
-```
+HTML routes:
 
-Expected manual QA results:
+- `GET /dashboard`
+- `GET /dashboard/events`
+- `GET /dashboard/events/:eventId`
+- `GET /dashboard/dead-letter`
+- `POST /dashboard/events/:eventId/replay`
 
-| Scenario                 | Expected event status | Expected delivery attempts                                    | Expected dead-letter row                                           |
-| ------------------------ | --------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------ |
-| success                  | `delivered`           | attempt `1` is `succeeded`                                    | none                                                               |
-| retry then success       | `delivered`           | attempt `1` is `failed_retryable`; attempt `2` is `succeeded` | none                                                               |
-| permanent failure        | `dead_lettered`       | attempt `1` is `failed_permanent`                             | `reason_code=permanent_delivery_failure`, `final_attempt_number=1` |
-| retry exhaustion variant | `dead_lettered`       | attempts `1..3` are `failed_retryable`                        | `reason_code=max_attempts_exhausted`, `final_attempt_number=3`     |
-
-There is no dedicated simulator CLI or fully automated manual-QA helper yet. Phase 4 E2E verification
-is currently documented as manual PowerShell requests plus SQL inspection. `pnpm db:studio` remains
-available for interactive inspection, but it is not a blocking validation command because it keeps a
-long-running process open. The worker handles `SIGINT` and `SIGTERM` by closing the BullMQ worker,
-Redis connection, and database client.
-
-Phase 4 validation commands:
-
-```powershell
-docker compose -f .\infra\docker-compose.yml up -d postgres redis
-pnpm install
-pnpm db:generate
-pnpm db:migrate
-pnpm test -- --run
-pnpm format:check
-pnpm lint
-pnpm typecheck
-git status --short
-```
-
-## Phase 5 Dashboard and Manual Replay
-
-Phase 5 makes webhook reliability visible and operator-actionable through server-rendered Hono HTML
-and small JSON endpoints for tests and future UI extension.
-
-Dashboard routes:
-
-- `GET /dashboard` — integration health summary and navigation.
-- `GET /dashboard/events` — recent events, newest first, with optional `?status=<event_status>`.
-- `GET /dashboard/events/:eventId` — canonical event fields, status history, delivery attempts,
-  dead-letter record, manual replay audit records, and a trimmed collapsed payload preview.
-- `GET /dashboard/dead-letter` — dead-letter records newest first.
-- `POST /dashboard/events/:eventId/replay` — local form action for manual replay.
-
-JSON routes return `{ "ok": true, "data": ... }` on success and `{ "ok": false, "error": ... }` on
-safe failures:
+JSON routes:
 
 - `GET /api/dashboard/summary`
 - `GET /api/dashboard/events`
@@ -454,272 +291,119 @@ safe failures:
 - `GET /api/dashboard/dead-letter`
 - `POST /api/dashboard/events/:eventId/replay`
 
-Summary metric definitions:
+Dashboard summary metrics:
 
-- `totalEventVolume`: count of `webhook_events` rows.
-- `successRate`: delivered events divided by accepted non-rejected events, returned as a `0..1`
-  number in JSON and rendered as a percentage in HTML.
-- `failedEvents`: events whose current status is `failed_retryable` or `dead_lettered`.
-- `retryCount`: delivery attempts where `attempt_number > 1`.
-- `deadLetterCount`: count of `dead_letter_events` rows.
-- `lastSuccessfulEvent`: most recent event with `last_successful_at`.
+- Event volume
+- Success rate
+- Failed events
+- Retry count
+- Dead-letter count
+- Last successful event
 
-Manual replay behavior:
+Manual replay is allowed for `dead_lettered` and `failed_retryable` events. It creates a manual
+replay audit row and queues a replay-specific delivery job. Replay does not weaken normal webhook
+idempotency.
 
-- Replay is allowed only for `dead_lettered` and `failed_retryable` events.
-- Replay is not allowed for delivered, queued, processing, received, validated, duplicate, rejected,
-  or `retry_scheduled` events. `retry_scheduled` is blocked because the dashboard cannot safely prove
-  no active BullMQ retry is pending from database state alone.
-- Each replay request creates one `manual_replays` audit row, appends replay request status history,
-  enqueues one replay-specific job ID of the form `delivery-replay-<manualReplayId>`, and marks the
-  audit row queued.
-- If enqueue fails, the audit row is marked failed and the API returns a safe 500 response.
-- Replay jobs continue delivery attempt numbering after the latest existing attempt. Normal webhook
-  delivery jobs still use `delivery-<eventId>` and remain idempotent by canonical event ID.
+## Simulator Scenarios
 
-Local-demo security note: the dashboard is not production-authenticated. Do not expose it publicly
-without adding authentication, authorization, CSRF protection, and deployment hardening in a later
-phase. No real provider APIs, provider SDKs, simulator commands, or paid services are used in Phase 5.
+Run after Docker services, migrations, API, and worker are running. `pnpm simulator:all` expects a
+clean demo state; use `pnpm demo:reset` first when rerunning the full sequence.
 
-Phase 5 validation commands:
+| Command                            | Sends                             | Expected API result                | Expected worker/dashboard result                     |
+| ---------------------------------- | --------------------------------- | ---------------------------------- | ---------------------------------------------------- |
+| `pnpm simulator:stripe-valid`      | Signed `stripe-sample` event      | `200`, `queued`                    | Delivered event visible in dashboard                 |
+| `pnpm simulator:success`           | `generic-http` success event      | `200`, `queued`                    | Delivered event with one successful attempt          |
+| `pnpm simulator:duplicate`         | Same generic event twice          | First queued, second duplicate     | One event, duplicate audit history, no second job    |
+| `pnpm simulator:invalid-signature` | Bad signed Stripe-style event     | `401`, invalid signature           | Rejected event, no delivery attempt                  |
+| `pnpm simulator:invalid-payload`   | Malformed generic payload         | `400`, invalid payload             | Rejected event, no delivery attempt                  |
+| `pnpm simulator:mock-crm-success`  | `mock-crm` success event          | `200`, `queued`                    | Delivered CRM event                                  |
+| `pnpm simulator:retry-success`     | Retryable failure then success    | `200`, `queued`                    | Failed attempt, retry, then delivered                |
+| `pnpm simulator:dead-letter`       | Always retryable failure          | `200`, `queued`                    | Retries exhausted, event dead-lettered               |
+| `pnpm simulator:permanent-failure` | Non-retryable downstream failure  | `200`, `queued`                    | Dead-lettered without unnecessary retries            |
+| `pnpm simulator:manual-replay`     | Dead-letter then replayable event | `200`, replay queued through API   | Replay audit row, replay job, delivered after replay |
+| `pnpm simulator:all`               | Full local demo sequence          | Runs all scenarios after preflight | Dashboard shows success, retry, reject, dead-letter  |
 
-```powershell
-docker compose -f .\infra\docker-compose.yml up -d postgres redis
-pnpm install
-pnpm db:generate
-pnpm db:migrate
-pnpm test -- --run
-pnpm format:check
-pnpm lint
-pnpm typecheck
-git status --short
-```
+Detailed scenario notes are in [docs/failure-scenarios.md](docs/failure-scenarios.md).
 
-Long-running local commands:
+## Demo Walkthrough
 
-```powershell
-pnpm dev:api
-pnpm dev:worker
-```
-
-Run `pnpm dev:api` and `pnpm dev:worker` in separate PowerShell terminals. The API process prints the
-dashboard URL; the expected local URL is usually `http://localhost:3000/dashboard`. Both commands are
-long-running.
-
-Manual verification checklist:
-
-- Load `http://localhost:3000/dashboard`.
-- Confirm summary counts render.
-- Create or seed failed/dead-letter data.
-- Confirm counts update.
-- Open `/dashboard/dead-letter`.
-- Replay a failed or dead-letter event.
-- Confirm a `manual_replays` audit record is created.
-- Confirm a replay-specific queue job is enqueued.
-- Confirm the worker processes the replay.
-- Confirm event status and history update.
-
-## Phase 6 Webhook Simulator and Demo Script
-
-Phase 6 turns the manual webhook examples into deterministic local simulator commands. The simulator
-targets `http://localhost:3000` by default, uses fake local payloads only, and does not require a
-public tunnel such as ngrok. It never calls Stripe, Shopify, Calendly, HubSpot, CRM, or other paid
-provider APIs.
-
-Default simulator configuration:
-
-- `SIMULATOR_API_BASE_URL=http://localhost:3000`
-- `STRIPE_SAMPLE_WEBHOOK_SECRET=whsec_local_test_secret`
-- `SIMULATOR_TIMEOUT_MS=10000`
-- `SIMULATOR_POLL_TIMEOUT_MS=30000`
-- `SIMULATOR_POLL_INTERVAL_MS=500`
-
-Clean start from PowerShell:
+Use this clean sequence for a portfolio demo:
 
 ```powershell
 Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
-
-docker compose -f .\infra\docker-compose.yml up -d postgres redis
 pnpm install
+Copy-Item .env.example .env
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
 pnpm db:migrate
-pnpm db:reset
-```
-
-For a fully clean simulator run, also clear local BullMQ jobs:
-
-```powershell
 pnpm demo:reset
 ```
 
-`pnpm demo:reset` runs the local-only database reset and local-only queue reset. The database reset
-refuses non-local PostgreSQL targets; the queue reset refuses non-local Redis targets.
-
-Terminal 1, API:
+Terminal 1:
 
 ```powershell
 pnpm dev:api
 ```
 
-Terminal 2, worker:
+Terminal 2:
 
 ```powershell
 pnpm dev:worker
 ```
 
-Both commands are long-running and should stay open in separate PowerShell terminals.
+Open:
 
-Terminal 3, simulator scenarios:
+```text
+http://localhost:3000/dashboard
+```
+
+Terminal 3:
 
 ```powershell
-pnpm simulator:stripe-valid
 pnpm simulator:success
 pnpm simulator:duplicate
 pnpm simulator:invalid-signature
 pnpm simulator:invalid-payload
-pnpm simulator:mock-crm-success
 pnpm simulator:retry-success
 pnpm simulator:dead-letter
-pnpm simulator:permanent-failure
 pnpm simulator:manual-replay
 ```
 
-Run the full clean demo sequence:
+During the demo:
 
-```powershell
-pnpm simulator:all
-```
+1. Show the clean dashboard.
+2. Run the success scenario.
+3. Run the duplicate scenario.
+4. Run the invalid signature scenario.
+5. Run the invalid payload scenario.
+6. Run the retry success scenario.
+7. Run the dead-letter scenario.
+8. Run the manual replay scenario.
+9. Open an event detail page and show status history.
+10. Return to the dashboard summary and show metric changes.
 
-`pnpm simulator:all` expects a clean demo database. Run `pnpm demo:reset` first if it reports
-existing events.
+The demo video script is in [docs/demo-video-script.md](docs/demo-video-script.md), and the
+screenshot checklist is in [docs/screenshot-checklist.md](docs/screenshot-checklist.md).
 
-Dashboard URLs:
+## Validation Commands
 
-- `http://localhost:3000/dashboard`
-- `http://localhost:3000/dashboard/events`
-- `http://localhost:3000/dashboard/dead-letter`
-
-What to look for:
-
-- Success and mock CRM events become `delivered`.
-- Duplicate events add a duplicate audit entry without a second delivery job.
-- Invalid signature and invalid payload events are rejected and not queued.
-- Retry success records failed attempt(s), then `delivered`.
-- Dead-letter and permanent-failure scenarios appear in the dead-letter page.
-- Manual replay creates a replay audit row, queues a replay-specific job, and reaches `delivered`.
-
-Stop local services:
-
-```powershell
-docker compose -f .\infra\docker-compose.yml down
-```
-
-Troubleshooting:
-
-- If a simulator command says the API is unreachable, start `pnpm dev:api`.
-- If status polling times out at `queued`, `processing`, or `retry_scheduled`, start
-  `pnpm dev:worker`.
-- If deterministic scenario IDs already exist, run `pnpm demo:reset`.
-- Do not replace fake local secrets with real provider secrets.
-
-## Phase 7 Reliability Hardening
-
-Phase 7 adds production-style guardrails while keeping the project local-first and fake-provider
-only. The API, worker, queue, database client, and simulator now validate runtime configuration,
-emit structured JSON logs, redact secret-like values, and carry request/job correlation IDs.
-
-Required local runtime values for manual validation:
-
-- `DATABASE_URL=postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor`
-- `REDIS_URL=redis://localhost:6379`
-- `STRIPE_SAMPLE_WEBHOOK_SECRET=whsec_local_test_secret`
-
-The API fails fast with a config validation error if `DATABASE_URL` or `REDIS_URL` is missing.
-Stripe-style simulator/webhook verification also requires `STRIPE_SAMPLE_WEBHOOK_SECRET` in the API
-process. If `pnpm simulator:all` returns `misconfigured_signature_secret`, stop the API, set
-`STRIPE_SAMPLE_WEBHOOK_SECRET` in that API terminal, restart `pnpm dev:api`, then rerun the
-simulator.
-
-Additional local configuration:
-
-- `LOG_LEVEL=debug`
-- `WEBHOOK_MAX_BODY_BYTES=1048576`
-- `WEBHOOK_RATE_LIMIT_WINDOW_MS=60000`
-- `WEBHOOK_RATE_LIMIT_MAX_REQUESTS=120`
-
-Health and readiness:
-
-- `GET /healthz` is a lightweight process health check.
-- `GET /readyz` checks database and queue reachability and returns `503` with safe dependency
-  status when Postgres or Redis is unavailable.
-
-Webhook ingress protection:
-
-- Every API response includes an `x-request-id` header. Incoming `x-request-id` is preserved when
-  valid; otherwise the API generates one.
-- Webhook errors return safe JSON with `correlationId` and no stack traces or secrets.
-- Oversized webhook bodies return `413 payload_too_large` before enqueueing.
-- Local in-memory rate limiting protects `POST /webhooks/:provider` and returns `429 rate_limited`
-  with `Retry-After` when exceeded.
-- If persistence succeeds but BullMQ enqueue fails, the event is not reported as queued. The API
-  records `queue_enqueue_failed` history and returns a safe `503`.
-
-Worker hardening:
-
-- Worker startup validates database and Redis connectivity before reporting ready.
-- Worker shutdown handles `SIGINT` and `SIGTERM`, closes BullMQ, Redis, and Postgres resources, is
-  idempotent, and uses a bounded timeout.
-- Delivery jobs carry optional `correlationId`; worker logs include correlation, job, event,
-  provider, and error-code fields without printing payloads or secrets.
-
-More detail is in `docs/reliability-hardening.md`; manual reliability checks are in
-`docs/manual-verification-checklist.md`.
-
-Phase 7 validated manual runtime flow:
-
-```powershell
-docker compose -f .\infra\docker-compose.yml up -d postgres redis
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
-pnpm db:migrate
-pnpm dev:api
-```
-
-In a separate worker terminal:
-
-```powershell
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-pnpm dev:worker
-```
-
-In a separate simulator/check terminal:
-
-```powershell
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
-curl.exe -i -H "x-request-id: manual-readyz-check" http://localhost:3000/readyz
-curl.exe -i -H "x-request-id: manual-dashboard-check" http://localhost:3000/dashboard
-pnpm simulator:all
-```
-
-## Phase 0 Validation Commands
-
-Run from the repository root:
+Standard local quality gate:
 
 ```powershell
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test
-docker compose -f .\infra\docker-compose.yml up -d
-docker compose -f .\infra\docker-compose.yml ps
-docker compose -f .\infra\docker-compose.yml down
+pnpm test -- --run
 git status --short
 ```
 
-Equivalent package scripts are available for Docker:
+Infrastructure checks:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
+docker compose -f .\infra\docker-compose.yml ps
+```
+
+Equivalent Docker package scripts:
 
 ```powershell
 pnpm docker:up
@@ -727,10 +411,94 @@ pnpm docker:ps
 pnpm docker:down
 ```
 
+## Package Scripts
+
+Common root scripts:
+
+| Script                      | Purpose                                 |
+| --------------------------- | --------------------------------------- |
+| `pnpm format`               | Format repository files with Prettier   |
+| `pnpm format:check`         | Check Prettier formatting               |
+| `pnpm lint`                 | Run ESLint                              |
+| `pnpm typecheck`            | Run TypeScript project type checking    |
+| `pnpm test`                 | Run Vitest                              |
+| `pnpm dev:api`              | Start the long-running local Hono API   |
+| `pnpm dev:worker`           | Start the long-running BullMQ worker    |
+| `pnpm db:generate`          | Generate Drizzle migrations             |
+| `pnpm db:migrate`           | Apply database migrations               |
+| `pnpm db:reset`             | Reset local application tables          |
+| `pnpm db:seed`              | Seed fake local demo data               |
+| `pnpm db:studio`            | Open Drizzle Studio                     |
+| `pnpm queue:reset`          | Clear the local delivery queue          |
+| `pnpm demo:reset`           | Reset local DB tables and queue         |
+| `pnpm demo:seed`            | Seed fake local demo data               |
+| `pnpm demo:run`             | Run `simulator:all`                     |
+| `pnpm docker:up`            | Start Docker Compose services           |
+| `pnpm docker:ps`            | Show Docker Compose service status      |
+| `pnpm docker:down`          | Stop Docker Compose services            |
+| `pnpm simulator:<scenario>` | Run a specific local simulator scenario |
+| `pnpm simulator:all`        | Run the full local simulator sequence   |
+
+## Troubleshooting
+
+Detailed troubleshooting is in [docs/troubleshooting.md](docs/troubleshooting.md).
+
+| Issue                                          | Likely cause                                       | Check                                                    | Fix                                                               |
+| ---------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------- |
+| Docker is not running                          | Docker Desktop is stopped                          | `docker compose -f .\infra\docker-compose.yml ps`        | Start Docker Desktop                                              |
+| Postgres port `5432` is in use                 | Another local Postgres process owns the port       | `docker compose -f .\infra\docker-compose.yml ps`        | Stop the other service or change local Docker ports intentionally |
+| Redis port `6379` is in use                    | Another Redis process owns the port                | `docker compose -f .\infra\docker-compose.yml ps`        | Stop the other service or change local Docker ports intentionally |
+| `pnpm` is unavailable                          | Corepack/pnpm is not enabled                       | `pnpm --version`                                         | Enable Corepack or install pnpm                                   |
+| Migrations fail                                | Postgres is down or `DATABASE_URL` is wrong        | `docker compose -f .\infra\docker-compose.yml ps`        | Start Postgres and use `.env.example` local values                |
+| API cannot connect to database                 | Postgres is unavailable or migrations were skipped | `Invoke-RestMethod -Uri "http://localhost:3000/readyz"`  | Start Postgres and run `pnpm db:migrate`                          |
+| Worker cannot connect to Redis                 | Redis is unavailable or `REDIS_URL` is wrong       | `docker compose -f .\infra\docker-compose.yml ps`        | Start Redis and restart `pnpm dev:worker`                         |
+| Simulator says API is unreachable              | API is not running or wrong base URL               | `Invoke-RestMethod -Uri "http://localhost:3000/healthz"` | Start `pnpm dev:api`                                              |
+| Dashboard has no data                          | No events were sent or DB was reset                | Open `/dashboard/events`                                 | Run `pnpm simulator:success`                                      |
+| Retry/dead-letter scenario does not finish     | Worker is not running or queue is backed up        | Check worker terminal logs                               | Start/restart `pnpm dev:worker`                                   |
+| Rate limit returns `429` during repeated tests | Local in-memory rate limit was exceeded            | Response includes `Retry-After`                          | Wait for the window or restart API for demo use                   |
+| Payload-size limit returns `413`               | Body exceeds `WEBHOOK_MAX_BODY_BYTES`              | Check payload size                                       | Use a smaller payload or intentionally raise the local limit      |
+| Invalid signature occurs unexpectedly          | Raw body or signing secret changed                 | Compare API and simulator `.env` values                  | Restart API after setting the fake secret                         |
+
+## Technical Tradeoffs
+
+- Hono server-rendered dashboard instead of Next.js keeps scope focused on backend reliability.
+- Fake provider adapters avoid real provider credentials and keep the demo repeatable.
+- The worker uses a local payload-driven mock downstream target instead of paid or real APIs.
+- PostgreSQL and Redis run through Docker Compose for realistic local persistence and queue behavior.
+- BullMQ retries replace hand-rolled retry loops.
+- In-memory rate limiting is local/demo only, not distributed production rate limiting.
+- The dashboard has no production authentication yet.
+- There is no hosted deployment yet.
+- There is no external observability vendor yet.
+
+## Future Improvements
+
+- Production authentication for the dashboard
+- Real provider adapters for Stripe, Shopify, HubSpot, and similar systems
+- Provider secret rotation
+- Multi-tenant integration accounts
+- OpenTelemetry tracing
+- Hosted deployment
+- GitHub Actions CI
+- Richer dashboard filters and charts
+- Email or Slack alerts for dead-letter events
+- Distributed rate limiting
+- Webhook replay authorization and audit controls
+- Payload redaction or encryption for sensitive data
+
+## Security And Secrets
+
+- All credentials in this repository are fake local values.
+- No real provider API calls are made by default.
+- Secrets must not be committed.
+- `.env` is ignored by Git.
+- `.env.example` is safe and fake.
+- The dashboard is local-demo only unless production authentication is added.
+
 ## Provider API Policy
 
 Real Stripe, Shopify, Calendly, HubSpot, CRM, or paid provider APIs are not used by default. Future
-phases should use mock/local-only values unless real API usage is explicitly approved.
+work should keep mock/local mode unless real API usage is explicitly approved.
 
 ## Codex Workflow Policy
 

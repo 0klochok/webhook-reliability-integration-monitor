@@ -1,43 +1,35 @@
-# Phase 7 Manual Verification Checklist
+# Manual Verification Checklist
 
-Use PowerShell from the repository root. All values below are fake local-only values from
-`.env.example`; do not substitute real provider credentials.
+Use PowerShell from the repository root. All values are fake local-only values from `.env.example`.
+Do not use real provider credentials.
 
-## Terminal Setup
+## Clean Setup Checklist
 
 ```powershell
 Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
-```
-
-Start local infrastructure first:
-
-```powershell
+node --version
+pnpm --version
+docker --version
+docker compose version
+git --version
+pnpm install
+Copy-Item .env.example .env
 docker compose -f .\infra\docker-compose.yml up -d postgres redis
 docker compose -f .\infra\docker-compose.yml ps
-```
-
-Set env vars in the same PowerShell terminal that will run the next command:
-
-```powershell
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
-```
-
-PowerShell env vars are process-local. Repeat the required assignments in every API, worker, and
-simulator terminal. Changing an env var after `pnpm dev:api` starts does not update that API
-process; stop and restart the API after changing `STRIPE_SAMPLE_WEBHOOK_SECRET`, `DATABASE_URL`, or
-`REDIS_URL`.
-
-## Automated Gate Baseline
-
-These were the Phase 7 validation gates:
-
-```powershell
-pnpm install
-pnpm db:generate
 pnpm db:migrate
-pnpm format
+pnpm demo:reset
+```
+
+Expected:
+
+- Node and pnpm meet versions in `package.json`.
+- Docker shows `postgres` and `redis` services.
+- Migrations complete.
+- Demo reset completes without refusing the local targets.
+
+## Validation Command Checklist
+
+```powershell
 pnpm format:check
 pnpm lint
 pnpm typecheck
@@ -45,114 +37,157 @@ pnpm test -- --run
 git status --short
 ```
 
-For manual runtime verification, `pnpm db:migrate` must run after Docker PostgreSQL is started and
-after `DATABASE_URL` is set in the migration terminal:
+Expected:
+
+- Formatting check passes.
+- ESLint passes.
+- TypeScript build check passes.
+- Vitest passes.
+- Git status shows only intentional documentation changes during Phase 8.
+
+## Docker, PostgreSQL, And Redis Checklist
 
 ```powershell
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
-pnpm db:migrate
-```
-
-## Start Local Processes
-
-Terminal 1, API:
-
-```powershell
-Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
-pnpm dev:api
-```
-
-The API requires `DATABASE_URL` and `REDIS_URL` to start. The simulator and Stripe-style webhook
-verification require the API process to have `STRIPE_SAMPLE_WEBHOOK_SECRET` loaded.
-
-Terminal 2, worker:
-
-```powershell
-Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-pnpm dev:worker
-```
-
-The worker requires `DATABASE_URL` and `REDIS_URL`. It fails fast when either value is missing or
-when the local database/Redis service is unreachable.
-
-## Runtime Smoke Checks
-
-Terminal 3:
-
-```powershell
-Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
-curl.exe -i -H "x-request-id: manual-readyz-check" http://localhost:3000/readyz
-curl.exe -i -H "x-request-id: manual-dashboard-check" http://localhost:3000/dashboard
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
+docker compose -f .\infra\docker-compose.yml ps
 ```
 
 Expected:
 
-- `/readyz` returns HTTP `200` when Postgres and Redis are reachable.
-- `/dashboard` returns HTTP `200`.
-- Responses include an `x-request-id` header.
-- Safe JSON errors include `correlationId` and do not include stack traces or secrets.
+- `webhook-monitor-postgres` is running and healthy.
+- `webhook-monitor-redis` is running and healthy.
 
-## Simulator Checks
+Optional readiness through the API after it starts:
 
-Run the simulator only after the API and worker are running and the API was started with
-`STRIPE_SAMPLE_WEBHOOK_SECRET` loaded:
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:3000/readyz"
+```
+
+Expected:
+
+- `ok` is `true`.
+- `dependencies.database` is `ok`.
+- `dependencies.queue` is `ok`.
+
+## API Checklist
+
+Terminal 1:
 
 ```powershell
 Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
-$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
-$env:REDIS_URL = "redis://localhost:6379"
-$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
+pnpm dev:api
+```
+
+Terminal 3:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:3000/healthz"
+Invoke-RestMethod -Method Get -Uri "http://localhost:3000/readyz"
+Invoke-WebRequest -Method Get -Uri "http://localhost:3000/dashboard"
+```
+
+Expected:
+
+- `pnpm dev:api` starts and stays running.
+- `/healthz` returns alive status.
+- `/readyz` returns dependency status.
+- `/dashboard` returns HTML.
+- Responses include `x-request-id`.
+
+## Worker Checklist
+
+Terminal 2:
+
+```powershell
+Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
+pnpm dev:worker
+```
+
+Expected:
+
+- Worker starts after Postgres and Redis are reachable.
+- Worker logs startup with configured concurrency.
+- Worker remains running until stopped with `Ctrl+C`.
+
+## Dashboard Checklist
+
+Open:
+
+```text
+http://localhost:3000/dashboard
+http://localhost:3000/dashboard/events
+http://localhost:3000/dashboard/dead-letter
+```
+
+Expected:
+
+- Summary renders event volume, success rate, failed events, retry count, dead-letter count, and last
+  successful event.
+- Events list renders recent events.
+- Dead-letter list renders dead-letter events after failure scenarios.
+- Event detail pages show status history, delivery attempts, payload preview, and replay audit rows.
+
+## Simulator Checklist
+
+Run in Terminal 3 after API and worker are running:
+
+```powershell
+Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
+pnpm simulator:success
+pnpm simulator:duplicate
+pnpm simulator:invalid-signature
+pnpm simulator:invalid-payload
+pnpm simulator:mock-crm-success
+pnpm simulator:retry-success
+pnpm simulator:dead-letter
+pnpm simulator:permanent-failure
+pnpm simulator:manual-replay
+```
+
+Expected:
+
+- Success scenarios end as delivered.
+- Duplicate scenario records duplicate audit history without duplicate delivery attempts.
+- Invalid signature returns `401` and is not queued.
+- Invalid payload returns `400` and is not queued.
+- Retry success records failed and succeeded attempts.
+- Dead-letter and permanent failure appear on the dead-letter page.
+- Manual replay creates audit history and eventually delivers.
+
+Full clean demo:
+
+```powershell
+pnpm demo:reset
 pnpm simulator:all
 ```
 
 Expected:
 
-- The simulator performs a `/readyz` preflight before scenarios.
-- Scenario output includes outbound `x-request-id` values and returned correlation IDs.
-- Duplicate, invalid signature, invalid payload, retry success, dead-letter, permanent failure, and
-  manual replay behavior match the Phase 6 demo.
+- Simulator preflight passes.
+- Full sequence completes against a clean state.
 
-## Failure-Mode Checks
+## Failure Scenario Checklist
 
-Redis readiness failure:
+Use [failure-scenarios.md](failure-scenarios.md) for detailed expected status transitions.
 
-```powershell
-docker compose -f .\infra\docker-compose.yml stop redis
-curl.exe -i -H "x-request-id: manual-redis-down-check" http://localhost:3000/readyz
-docker compose -f .\infra\docker-compose.yml start redis
-```
+Minimum manual checks:
 
-Expected:
+- Duplicate event has one canonical event row.
+- Invalid signature has no delivery attempt.
+- Invalid payload has no delivery attempt.
+- Retry success has at least two delivery attempts.
+- Dead-letter event has a `dead_letter_events` record.
+- Permanent failure dead-letters without repeated retry attempts.
+- Manual replay has a `manual_replays` audit row.
 
-- `/readyz` returns HTTP `503` or reports `queue=unavailable`.
-- Restarted worker logs a clear queue/Redis startup error if Redis is still stopped.
-- Webhook enqueue failure is explicit and does not report `status=queued`.
-- Logs and responses do not print `REDIS_URL`.
+## Reliability Hardening Checklist
 
-Postgres readiness failure:
+Health and readiness:
 
 ```powershell
-docker compose -f .\infra\docker-compose.yml stop postgres
-curl.exe -i -H "x-request-id: manual-postgres-down-check" http://localhost:3000/readyz
-docker compose -f .\infra\docker-compose.yml start postgres
+Invoke-RestMethod -Method Get -Uri "http://localhost:3000/healthz"
+Invoke-RestMethod -Method Get -Uri "http://localhost:3000/readyz"
 ```
-
-Expected:
-
-- `/readyz` returns HTTP `503` or reports `database=unavailable`.
-- Routes that require database access return safe explicit errors.
-- Restarted worker startup fails clearly if Postgres is still stopped.
-- Logs and responses do not print `DATABASE_URL` credentials.
 
 Oversized payload:
 
@@ -163,9 +198,7 @@ $largePayload = @{
   occurredAt = "2026-06-20T12:00:00.000Z"
   source = "manual-check"
   idempotencyKey = "manual_oversized_payload:idempotency"
-  payload = @{
-    blob = "x" * 1200000
-  }
+  payload = @{ blob = "x" * 1200000 }
 } | ConvertTo-Json -Depth 5
 
 try {
@@ -179,13 +212,7 @@ try {
 }
 ```
 
-Expected:
-
-- HTTP status `413`.
-- Response error code `payload_too_large`.
-- Response includes `x-request-id`.
-- No delivery job is enqueued.
-- Logs do not include the full body.
+Expected: HTTP `413`.
 
 Rate limit:
 
@@ -215,80 +242,24 @@ Rate limit:
 }
 ```
 
-Expected:
+Expected: a later request returns HTTP `429` with `Retry-After`.
 
-- Requests under the configured limit proceed normally.
-- A later request returns HTTP `429`.
-- `Retry-After` is present where practical.
-- The rate-limited request is not enqueued.
+## Security And Secrets Checklist
 
-Correlation ID propagation:
+- `.env.example` contains fake local values only.
+- `.env` is ignored by Git.
+- No real Stripe, Shopify, Calendly, HubSpot, CRM, or paid API credentials are used.
+- Logs and responses do not print URL credentials or secret-like values.
+- Dashboard remains on localhost and is not exposed publicly.
 
-```powershell
-$payload = @{
-  eventId = "manual_correlation_check"
-  eventType = "order.fulfilled"
-  occurredAt = "2026-06-20T12:00:00.000Z"
-  source = "manual-check"
-  idempotencyKey = "manual_correlation_check:idempotency"
-  payload = @{ orderId = "order_correlation" }
-} | ConvertTo-Json -Depth 5
+## Final Portfolio Readiness Checklist
 
-$response = Invoke-WebRequest `
-  -Method Post `
-  -Uri "http://localhost:3000/webhooks/generic-http" `
-  -ContentType "application/json" `
-  -Headers @{ "x-request-id" = "demo-correlation-123" } `
-  -Body $payload
-
-$response.Headers["x-request-id"]
-$response.Content
-```
-
-Expected:
-
-- Response header `x-request-id` is `demo-correlation-123`.
-- API and worker logs include `correlationId=demo-correlation-123`.
-- Queue job data carries the same correlation ID.
-
-## Troubleshooting
-
-If `pnpm dev:api` fails with `DATABASE_URL` or `REDIS_URL` required:
-
-- Set `DATABASE_URL` and `REDIS_URL` in the same terminal before running `pnpm dev:api`.
-- Use the exact values from `.env.example`.
-- Confirm Docker services are running with
-  `docker compose -f .\infra\docker-compose.yml ps`.
-
-If `pnpm dev:worker` fails with `database_connection_failed`:
-
-- Verify `DATABASE_URL` matches `.env.example`.
-- Confirm Docker Postgres is running and healthy.
-- Run `pnpm db:migrate` after fixing the env value.
-
-If `pnpm db:migrate` fails with `password authentication failed`:
-
-- The `DATABASE_URL` password does not match the local Postgres container or existing Docker volume.
-- Use the exact `DATABASE_URL` from `.env.example`.
-- Verify `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` in `.env.example` match
-  `infra/docker-compose.yml`.
-
-If `pnpm simulator:all` fails with `misconfigured_signature_secret: Webhook signature verification is not configured for this provider.`:
-
-- Stop the API process.
-- In the API terminal, set
-  `$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"`.
-- Restart `pnpm dev:api`.
-- Rerun `pnpm simulator:all` from the simulator terminal.
-
-Earlier Phase 7 manual failures were caused by missing or incorrect local environment variables, not
-by reliability hardening implementation defects.
-
-## Safety Checks
-
-- No real provider secrets are required or printed.
-- No real provider APIs are called.
-- Simulator targets `http://localhost:3000` by default.
-- Database reset refuses non-local PostgreSQL targets.
-- Queue reset refuses non-local Redis targets.
-- No public tunnel is required.
+- README explains the business problem and value.
+- Architecture diagram is visible and accurate.
+- Demo video script exists.
+- Screenshot checklist exists.
+- Failure scenarios are tied to business meaning.
+- Manual verification commands are PowerShell-compatible.
+- Troubleshooting covers common local failures.
+- Tradeoffs are honest.
+- Future improvements are realistic and clearly not implemented yet.

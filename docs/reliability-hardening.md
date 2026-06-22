@@ -1,5 +1,9 @@
 # Phase 7 Reliability Hardening
 
+This remains the detailed hardening reference for the Phase 8 portfolio documentation. The README
+summarizes these behaviors for evaluators; this file keeps the implementation-focused verification
+notes.
+
 Phase 7 adds pragmatic production-style guardrails to the local webhook reliability demo without
 changing the core product scope.
 

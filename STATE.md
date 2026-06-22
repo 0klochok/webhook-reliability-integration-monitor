@@ -10,10 +10,10 @@
 - Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
 - Current branch: `main`
 - Current phase: Phase 6 — Webhook simulator and failure scenarios
-- Overall status: yellow
-- Quality gate status: partial; Docker-dependent gates blocked
-- Completion: 95%
-- Main blocker: Docker Desktop daemon unavailable in the current local session
+- Overall status: green
+- Quality gate status: green; Phase 6 validation passed (`pnpm build` n/a)
+- Completion: 100%
+- Main blocker: none
 
 ## Update rules
 
@@ -34,10 +34,10 @@
 
 ## 2. Status snapshot
 
-- Summary: Phase 6 simulator, demo docs, local queue reset helper, and manual-replay demo behavior are implemented. Docker-dependent validation is blocked because Docker Desktop is not running.
+- Summary: Phase 6 simulator, demo docs, local queue reset helper, and manual-replay demo behavior are implemented and validated.
 - Since last update: Added simulator CLI, scenario payload/signing helpers, simulator tests, root simulator/demo scripts, docs, README Phase 6 demo section, local BullMQ queue reset, and `fail-until-manual-replay-success` worker behavior.
-- Current focus: User review, then rerun Docker-backed validation after Docker Desktop is available.
-- Main uncertainty: Docker-backed API/worker/simulator smoke results are not yet observed in this local session.
+- Current focus: User review and manual commit when ready.
+- Main uncertainty: none known for Phase 6 validation.
 
 ## 3. Completed phases / milestones
 
@@ -51,7 +51,7 @@
 | Phase 4.1 — Verification   | 2026-06-21 | Docs-only manual QA and validation-status clarification for Phase 4 webhook E2E checks.                | green        | none        |
 | Phase 4.2 — QA recording   | 2026-06-21 | Docs-only recording of provided Phase 4 manual webhook E2E QA evidence and skip reasons.               | green        | none        |
 | Phase 5 — Dashboard/replay | 2026-06-21 | Hono dashboard, dashboard JSON endpoints, manual replay audit, replay queue jobs, and worker replay.   | green        | none        |
-| Phase 6 — Simulator/demo   | 2026-06-22 | Repeatable local simulator commands, failure scenario docs, queue reset, and replay demo behavior.     | partial      | none        |
+| Phase 6 — Simulator/demo   | 2026-06-22 | Repeatable local simulator commands, failure scenario docs, queue reset, and replay demo behavior.     | green        | none        |
 
 ## 4. Completed since last update
 
@@ -73,6 +73,7 @@
 - 2026-06-21: Added Phase 5 docs-only validation patch — evidence: this `STATE.md` records provided dashboard, browser, manual replay, worker, and SQL verification results; `README.md` keeps SQL examples aligned with real FK columns.
 - 2026-06-22: Implemented Phase 6 simulator/demo behavior — evidence: `tools/simulator/src`, `tools/simulator/test`, root simulator scripts, `docs/demo-script.md`, `docs/failure-scenarios.md`, `docs/manual-verification-checklist.md`, README Phase 6 docs, local queue reset script, and worker replay-demo behavior.
 - 2026-06-22: Completed non-Docker Phase 6 validation — evidence: `pnpm install`, `pnpm db:generate`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, simulator tests, non-Redis/non-Postgres Vitest slice, and API-unreachable simulator smoke check.
+- 2026-06-22: Completed Phase 6 validation — evidence: `pnpm install`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, Docker-backed PostgreSQL/Redis/API/worker/simulator validation, and manual dashboard verification passed; `pnpm build` was skipped/not applicable because no root `build` script exists (`Command "build" not found`); no commit, push, tag, or remote changes were made.
 
 ## 5. Changed files
 
@@ -115,10 +116,30 @@
 | `packages/db/src/repositories/dashboard.ts`, db repository tests  | Phase 5 dashboard persistence APIs   | updated | Summary/list/detail/dead-letter queries, replay eligibility, replay audit creation, and metric tests.            |
 | `packages/queue`, `apps/worker`                                   | Phase 5 replay queue/worker support  | updated | Replay job metadata/IDs and worker replay success/failure audit behavior.                                        |
 | `README.md`, `STATE.md`                                           | Phase 5 manual QA docs record        | updated | Docs-only validation patch; no runtime code, tests, dependencies, migrations, workspace, or infra changes.       |
+| `STATE.md`                                                        | Phase 6 validation evidence          | updated | Docs/state-only patch records Phase 6 gate pass evidence, `pnpm build` n/a, and no Git history/remote actions.   |
 
 ## 6. Validation and quality gates
 
 ### Required gates
+
+### Phase 6 simulator/demo validation
+
+| Gate             | Command / check                                                     | Status  | Evidence / notes                                                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| install          | `pnpm install`                                                      | pass    | Phase 6 validation evidence records install completed successfully.                                                                                                                                                                                                        |
+| Docker services  | `docker compose -f .\infra\docker-compose.yml up -d postgres redis` | pass    | Docker-backed PostgreSQL and Redis validation passed for the local Phase 6 demo gate.                                                                                                                                                                                      |
+| migration apply  | `pnpm db:migrate`                                                   | pass    | Database migration gate passed before demo reset and simulator validation.                                                                                                                                                                                                 |
+| demo reset       | `pnpm demo:reset`                                                   | pass    | Local database tables and BullMQ queue were reset for repeatable simulator validation.                                                                                                                                                                                     |
+| format           | `pnpm format:check`                                                 | pass    | Formatting gate passed.                                                                                                                                                                                                                                                    |
+| lint             | `pnpm lint`                                                         | pass    | ESLint gate passed.                                                                                                                                                                                                                                                        |
+| typecheck        | `pnpm typecheck`                                                    | pass    | TypeScript project-reference gate passed.                                                                                                                                                                                                                                  |
+| tests            | `pnpm test`                                                         | pass    | Vitest gate passed.                                                                                                                                                                                                                                                        |
+| API smoke        | `pnpm dev:api`                                                      | pass    | API process started for Docker-backed simulator and dashboard validation.                                                                                                                                                                                                  |
+| worker smoke     | `pnpm dev:worker`                                                   | pass    | Worker process started for Docker-backed simulator validation.                                                                                                                                                                                                             |
+| simulator smoke  | `pnpm simulator:all`                                                | pass    | Full local simulator flow passed across success, duplicate, invalid signature/payload, retry, dead-letter, permanent failure, and manual replay scenarios.                                                                                                                 |
+| dashboard manual | manual browser/dashboard verification                               | pass    | Dashboard verification passed for event volume, success rate, failed events, retry count, dead-letter visibility, manual replay, and last successful event signals.                                                                                                        |
+| build            | `pnpm build`                                                        | skipped | Not applicable: no `build` script exists in the root `package.json`; direct run returned `Command "build" not found`. Current Phase 6 gate uses format, lint, typecheck, tests, Docker-backed DB/Redis/API/worker/simulator validation, and manual dashboard verification. |
+| Git safety       | commit/push/tag/remote changes                                      | n/a     | No commit, push, tag, or remote changes were made.                                                                                                                                                                                                                         |
 
 ### Phase 5 dashboard and manual replay validation
 
@@ -324,11 +345,10 @@
 
 ## 7. Active tasks
 
-| ID       | Priority | Task                                                        | Owner      | Status | ETA  | Notes                                                               |
-| -------- | -------- | ----------------------------------------------------------- | ---------- | ------ | ---- | ------------------------------------------------------------------- |
-| TASK-001 | P1       | Review Phase 6 implementation and validation result.        | User       | todo   | none | Do not commit or push from Codex.                                   |
-| TASK-002 | P1       | Start Docker Desktop and rerun Docker-backed Phase 6 gates. | User/Codex | todo   | none | Required for Postgres, Redis, API/worker, and simulator full smoke. |
-| TASK-003 | P2       | Commit manually when ready.                                 | User       | todo   | none | Codex must not commit or push.                                      |
+| ID       | Priority | Task                                      | Owner | Status | ETA  | Notes                             |
+| -------- | -------- | ----------------------------------------- | ----- | ------ | ---- | --------------------------------- |
+| TASK-001 | P1       | Review Phase 6 validation evidence patch. | User  | todo   | none | Do not commit or push from Codex. |
+| TASK-002 | P2       | Commit manually when ready.               | User  | todo   | none | Codex must not commit or push.    |
 
 ## 8. Backlog / long horizon
 
@@ -338,9 +358,9 @@
 
 ## 9. Known issues
 
-| ID        | Issue                                                                               | Severity | Owner / layer | Next action                                   | Target  |
-| --------- | ----------------------------------------------------------------------------------- | -------- | ------------- | --------------------------------------------- | ------- |
-| ISSUE-001 | Docker Desktop daemon unavailable; Compose cannot reach `dockerDesktopLinuxEngine`. | medium   | local infra   | Start Docker Desktop and rerun blocked gates. | Phase 6 |
+| ID        | Issue                               | Severity | Owner / layer | Next action                | Target |
+| --------- | ----------------------------------- | -------- | ------------- | -------------------------- | ------ |
+| ISSUE-001 | No known Phase 6 validation issues. | low      | n/a           | Continue with user review. | none   |
 
 ## 10. Risks
 
@@ -372,15 +392,15 @@
 
 ## 13. Next 3 actions
 
-1. User: Start Docker Desktop — expected result: `docker compose -f .\infra\docker-compose.yml up -d postgres redis` succeeds.
-2. User/Codex: Rerun blocked gates — expected result: `pnpm db:migrate`, `pnpm db:reset`, `pnpm test -- --run`, API/worker smoke, and simulator smoke complete.
-3. User: Review and commit manually when ready — expected result: Phase 6 simulator/demo behavior captured in Git history.
+1. User: Review the Phase 6 validation evidence patch — expected result: docs/state wording matches the completed local validation.
+2. User: Commit manually when ready — expected result: Phase 6 simulator/demo behavior captured in Git history.
+3. User/Codex: Choose the next phase — expected result: scope remains phase-gated and local-first.
 
 ## 14. Handoff notes
 
-- Start here next: `TASK-002`
+- Start here next: `TASK-001`
 - Read first: `README.md`, `docs/demo-script.md`, `tools/simulator/src/index.ts`, `tools/simulator/src/scenarios`, `packages/queue/src/scripts/reset.ts`, and `apps/worker/src/mock-downstream-client.ts`
-- Commands to run first for next-phase setup check: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`; `pnpm db:migrate`; `pnpm demo:reset`; `pnpm test -- --run`; `pnpm simulator:all`
+- Commands to run first for next-phase setup check: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`; `pnpm db:migrate`; `pnpm demo:reset`; `pnpm test`; `pnpm simulator:all`
 - Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior outside the approved phase.
 - Watch for: next-phase scope creep and any request that would introduce real provider credentials, paid API usage, provider SDKs, or deployment automation before those are approved.
-- Suggested next prompt: `Start the next phase after reviewing Phase 5 validation and choosing simulator, demo script, or hardening scope.`
+- Suggested next prompt: `Start the next phase after reviewing Phase 6 validation and choosing the next phase scope.`

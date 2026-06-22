@@ -16,6 +16,9 @@ const config: SimulatorConfig = {
 const createResponse = (status: number, body: unknown) => ({
   status,
   ok: status >= 200 && status < 300,
+  headers: new Headers({
+    "x-request-id": "simulator-response-123"
+  }),
   text: async () => JSON.stringify(body)
 });
 
@@ -26,8 +29,23 @@ describe("simulator HTTP client", () => {
     await expect(client.request({ method: "GET", path: "/healthz" })).resolves.toMatchObject({
       status: 200,
       ok: true,
+      headers: {
+        "x-request-id": "simulator-response-123"
+      },
       body: { ok: true }
     });
+  });
+
+  it("sends a request correlation header", async () => {
+    let requestId: string | undefined;
+    const client = createSimulatorHttpClient(config, async (_url, init) => {
+      requestId = new Headers(init.headers).get("x-request-id") ?? undefined;
+      return createResponse(200, { ok: true });
+    });
+
+    await client.request({ method: "GET", path: "/healthz" });
+
+    expect(requestId).toEqual(expect.any(String));
   });
 
   it("returns expected 4xx responses without crashing", async () => {

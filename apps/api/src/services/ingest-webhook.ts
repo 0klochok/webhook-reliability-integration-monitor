@@ -4,6 +4,7 @@ import {
   getProviderAdapter,
   isProviderId,
   type JsonValue,
+  type Logger,
   type NormalizedEvent,
   type ProviderId
 } from "@webhook-monitor/core";
@@ -27,6 +28,7 @@ export interface IngestWebhookDependencies {
   readonly config: ApiConfig;
   readonly webhookEvents: WebhookEventRepository;
   readonly deliveryQueue: DeliveryQueuePort;
+  readonly logger: Logger;
   readonly clock?: () => Date;
 }
 
@@ -34,6 +36,7 @@ export interface IngestWebhookInput {
   readonly providerParam: string;
   readonly rawBody: string;
   readonly headers: Record<string, string | undefined>;
+  readonly correlationId: string;
 }
 
 export interface IngestWebhookResult {
@@ -77,6 +80,20 @@ const issueMessagesFromError = (error: unknown): string[] => {
 
 const toHistoryMetadata = (value: JsonValue): JsonValue => value;
 
+const withCorrelationMetadata = (metadata: JsonValue, correlationId: string): JsonValue => {
+  if (typeof metadata === "object" && metadata !== null && !Array.isArray(metadata)) {
+    return {
+      ...metadata,
+      correlationId
+    };
+  }
+
+  return {
+    value: metadata,
+    correlationId
+  };
+};
+
 const addMilliseconds = (date: Date, milliseconds: number): Date =>
   new Date(date.getTime() + milliseconds);
 
@@ -85,6 +102,7 @@ const createRejectionResponse = (input: {
   readonly code: "invalid_signature" | "invalid_json" | "invalid_payload";
   readonly message: string;
   readonly eventId: string;
+  readonly correlationId: string;
   readonly issues?: readonly string[];
 }): IngestWebhookResult => ({
   statusCode: input.statusCode,
@@ -92,6 +110,7 @@ const createRejectionResponse = (input: {
     code: input.code,
     message: input.message,
     eventId: input.eventId,
+    correlationId: input.correlationId,
     issues: input.issues
   })
 });
@@ -108,6 +127,7 @@ const persistRejectedEvent = async (
     readonly reasonCode: string;
     readonly message: string;
     readonly metadata: JsonValue;
+    readonly correlationId: string;
   }
 ) => {
   const normalizedEvent = createRejectedNormalizedEvent({
@@ -127,7 +147,7 @@ const persistRejectedEvent = async (
       initialHistory: {
         reasonCode: input.reasonCode,
         message: input.message,
-        metadata: input.metadata,
+        metadata: withCorrelationMetadata(input.metadata, input.correlationId),
         createdAt: input.receivedAt
       },
       createdAt: input.receivedAt,
@@ -151,6 +171,7 @@ const verifySignatureIfRequired = async (
     readonly headers: Record<string, string | undefined>;
     readonly payloadHash: string;
     readonly receivedAt: Date;
+    readonly correlationId: string;
   }
 ): Promise<IngestWebhookResult | undefined> => {
   const adapter = getProviderAdapter(input.providerId);
@@ -194,14 +215,16 @@ const verifySignatureIfRequired = async (
     metadata: toHistoryMetadata({
       reasonCode,
       payloadHash: input.payloadHash
-    })
+    }),
+    correlationId: input.correlationId
   });
 
   return createRejectionResponse({
     statusCode: 401,
     code: "invalid_signature",
     message: "Webhook signature verification failed.",
-    eventId: persisted.event.id
+    eventId: persisted.event.id,
+    correlationId: input.correlationId
   });
 };
 
@@ -213,6 +236,7 @@ const parseTrustedJson = async (
     readonly payloadHash: string;
     readonly receivedAt: Date;
     readonly signatureVerificationRequired: boolean;
+    readonly correlationId: string;
   }
 ): Promise<{ readonly parsedPayload: unknown } | IngestWebhookResult> => {
   const parsedPayload = parseJsonSafely(input.rawBody);
@@ -232,14 +256,16 @@ const parseTrustedJson = async (
     metadata: toHistoryMetadata({
       reasonCode: "invalid_json",
       payloadHash: input.payloadHash
-    })
+    }),
+    correlationId: input.correlationId
   });
 
   return createRejectionResponse({
     statusCode: 400,
     code: "invalid_json",
     message: "Webhook request body must be valid JSON.",
-    eventId: persisted.event.id
+    eventId: persisted.event.id,
+    correlationId: input.correlationId
   });
 };
 
@@ -252,6 +278,7 @@ const normalizeTrustedPayload = async (
     readonly headers: Record<string, string | undefined>;
     readonly receivedAt: Date;
     readonly signatureVerificationRequired: boolean;
+    readonly correlationId: string;
   }
 ) => {
   const adapter = getProviderAdapter(input.providerId);
@@ -279,7 +306,8 @@ const normalizeTrustedPayload = async (
         reasonCode: "schema_validation_failed",
         issues: Array.from(issues),
         payloadHash: input.payloadHash
-      })
+      }),
+      correlationId: input.correlationId
     });
 
     return createRejectionResponse({
@@ -287,6 +315,7 @@ const normalizeTrustedPayload = async (
       code: "invalid_payload",
       message: "Webhook payload failed provider schema validation.",
       eventId: persisted.event.id,
+      correlationId: input.correlationId,
       issues
     });
   }
@@ -297,6 +326,7 @@ const persistAcceptedEvent = async (
   input: {
     readonly normalizedEvent: NormalizedEvent;
     readonly receivedAt: Date;
+    readonly correlationId: string;
   }
 ): Promise<IngestWebhookResult> => {
   let createResult: Awaited<
@@ -311,7 +341,8 @@ const persistAcceptedEvent = async (
         reasonCode: "webhook_received",
         message: "Webhook event was received.",
         metadata: {
-          payloadHash: input.normalizedEvent.payloadHash
+          payloadHash: input.normalizedEvent.payloadHash,
+          correlationId: input.correlationId
         },
         createdAt: input.receivedAt
       },
@@ -337,7 +368,8 @@ const persistAcceptedEvent = async (
         message: "Duplicate webhook event was ignored.",
         metadata: {
           providerId: input.normalizedEvent.providerId,
-          externalEventId: input.normalizedEvent.externalEventId
+          externalEventId: input.normalizedEvent.externalEventId,
+          correlationId: input.correlationId
         },
         createdAt: addMilliseconds(input.receivedAt, 3)
       });
@@ -372,7 +404,8 @@ const persistAcceptedEvent = async (
       message: "Webhook payload passed provider validation.",
       metadata: {
         providerId: input.normalizedEvent.providerId,
-        externalEventId: input.normalizedEvent.externalEventId
+        externalEventId: input.normalizedEvent.externalEventId,
+        correlationId: input.correlationId
       },
       changedAt: addMilliseconds(input.receivedAt, 1)
     });
@@ -394,12 +427,36 @@ const persistAcceptedEvent = async (
       eventId: createResult.event.id,
       providerId: input.normalizedEvent.providerId,
       externalEventId: input.normalizedEvent.externalEventId,
+      correlationId: input.correlationId,
       enqueuedAt: queuedAt.toISOString()
     });
   } catch (cause) {
+    try {
+      await dependencies.webhookEvents.transitionStatus({
+        eventId: createResult.event.id,
+        toStatus: "failed_retryable",
+        reasonCode: "queue_enqueue_failed",
+        message: "Webhook event could not be queued for delivery.",
+        metadata: {
+          queue: webhookDeliveryQueueName,
+          correlationId: input.correlationId
+        },
+        changedAt: queuedAt
+      });
+    } catch (transitionError) {
+      dependencies.logger.error("Failed to record queue enqueue failure status.", {
+        correlationId: input.correlationId,
+        eventId: createResult.event.id,
+        providerId: input.normalizedEvent.providerId,
+        externalEventId: input.normalizedEvent.externalEventId,
+        errorCode: "persistence_error",
+        error: transitionError instanceof Error ? transitionError : undefined
+      });
+    }
+
     throw new ApiError({
       code: "queue_enqueue_failed",
-      statusCode: 500,
+      statusCode: 503,
       publicMessage: "The webhook event could not be queued for delivery.",
       eventId: createResult.event.id,
       cause
@@ -414,7 +471,8 @@ const persistAcceptedEvent = async (
       message: "Webhook event was accepted by the delivery queue.",
       metadata: {
         queue: webhookDeliveryQueueName,
-        queueJobId: enqueueResult.queueJobId
+        queueJobId: enqueueResult.queueJobId,
+        correlationId: input.correlationId
       },
       changedAt: queuedAt
     });
@@ -450,7 +508,8 @@ export const ingestWebhook = async (
       statusCode: 404,
       body: createErrorResponse({
         code: "unsupported_provider",
-        message: "Unsupported webhook provider."
+        message: "Unsupported webhook provider.",
+        correlationId: input.correlationId
       })
     };
   }
@@ -465,7 +524,8 @@ export const ingestWebhook = async (
     rawBody: input.rawBody,
     headers: input.headers,
     payloadHash,
-    receivedAt
+    receivedAt,
+    correlationId: input.correlationId
   });
 
   if (signatureResult) {
@@ -477,7 +537,8 @@ export const ingestWebhook = async (
     rawBody: input.rawBody,
     payloadHash,
     receivedAt,
-    signatureVerificationRequired: adapter.requiresSignatureVerification
+    signatureVerificationRequired: adapter.requiresSignatureVerification,
+    correlationId: input.correlationId
   });
 
   if ("body" in parseResult) {
@@ -490,7 +551,8 @@ export const ingestWebhook = async (
     payloadHash,
     headers: input.headers,
     receivedAt,
-    signatureVerificationRequired: adapter.requiresSignatureVerification
+    signatureVerificationRequired: adapter.requiresSignatureVerification,
+    correlationId: input.correlationId
   });
 
   if ("body" in normalizeResult) {
@@ -499,6 +561,7 @@ export const ingestWebhook = async (
 
   return persistAcceptedEvent(dependencies, {
     normalizedEvent: normalizeResult,
-    receivedAt
+    receivedAt,
+    correlationId: input.correlationId
   });
 };

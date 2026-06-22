@@ -1,4 +1,4 @@
-import { assertCleanDashboard } from "./helpers.js";
+import { assertApiReady, assertCleanDashboard } from "./helpers.js";
 import { deadLetterScenario } from "./dead-letter.js";
 import { duplicateScenario } from "./duplicate.js";
 import { invalidGenericPayloadScenario } from "./invalid-generic-payload.js";
@@ -36,6 +36,7 @@ export const allScenario: Scenario = {
   id: "all",
   createPlan: createAllScenarioPlan,
   run: async (context: ScenarioContext) => {
+    await assertApiReady(context);
     await assertCleanDashboard(context);
 
     for (const scenario of scenarios) {

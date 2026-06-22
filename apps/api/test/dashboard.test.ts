@@ -357,8 +357,8 @@ describe("dashboard dead-letter and replay routes", () => {
     };
     const replayRows = await manualReplays.listReplaysForOriginalEvent(deadLettered.id);
 
-    expect(response.status).toBe(500);
-    expect(body.error.code).toBe("queue_enqueue_failed");
+    expect(response.status).toBe(503);
+    expect(body.error.code).toBe("replay_enqueue_failed");
     expect(replayRows).toHaveLength(1);
     expect(replayRows[0]?.status).toBe("failed");
   });

@@ -1,9 +1,11 @@
 import {
   calculateRetryDelayMs,
+  createCorrelationId,
   isTerminalStatus,
   type EventStatus,
   type JsonObject,
   type JsonValue,
+  type Logger,
   type RetryPolicy
 } from "@webhook-monitor/core";
 import type {
@@ -38,6 +40,7 @@ export interface DeliveryProcessorDependencies {
   readonly downstreamClient: MockDownstreamClient;
   readonly retryPolicy: RetryPolicy;
   readonly targetUrl: string;
+  readonly logger: Logger;
   readonly clock?: () => Date;
 }
 
@@ -64,6 +67,9 @@ const getJobAttemptNumber = (job: DeliveryProcessorJob): number => job.attemptsM
 
 const isReplayJob = (job: DeliveryProcessorJob): boolean => job.data.manualReplayId !== undefined;
 
+const getCorrelationId = (job: DeliveryProcessorJob): string =>
+  job.data.correlationId ?? createCorrelationId();
+
 const getAttemptNumber = async (
   dependencies: DeliveryProcessorDependencies,
   job: DeliveryProcessorJob,
@@ -89,11 +95,13 @@ const toFailureMessage = (result: Extract<MockDownstreamDeliveryResult, { ok: fa
 
 const createFailureMetadata = (input: {
   readonly job: DeliveryProcessorJob;
+  readonly correlationId: string;
   readonly attemptNumber: number;
   readonly jobAttemptNumber: number;
   readonly result: Extract<MockDownstreamDeliveryResult, { ok: false }>;
 }): JsonObject => ({
   queueJobId: input.job.id ?? null,
+  correlationId: input.correlationId,
   attemptNumber: input.attemptNumber,
   jobAttemptNumber: input.jobAttemptNumber,
   manualReplayId: input.job.data.manualReplayId ?? null,
@@ -103,11 +111,13 @@ const createFailureMetadata = (input: {
 
 const createSuccessMetadata = (input: {
   readonly job: DeliveryProcessorJob;
+  readonly correlationId: string;
   readonly attemptNumber: number;
   readonly jobAttemptNumber: number;
   readonly httpStatusCode: number;
 }): JsonObject => ({
   queueJobId: input.job.id ?? null,
+  correlationId: input.correlationId,
   attemptNumber: input.attemptNumber,
   jobAttemptNumber: input.jobAttemptNumber,
   manualReplayId: input.job.data.manualReplayId ?? null,
@@ -118,6 +128,7 @@ const markManualReplayCompleted = async (
   dependencies: DeliveryProcessorDependencies,
   input: {
     readonly job: DeliveryProcessorJob;
+    readonly correlationId: string;
     readonly completedAt: Date;
     readonly attemptNumber: number;
   }
@@ -131,6 +142,7 @@ const markManualReplayCompleted = async (
     input.completedAt,
     {
       queueJobId: input.job.id ?? null,
+      correlationId: input.correlationId,
       attemptNumber: input.attemptNumber
     }
   );
@@ -140,6 +152,7 @@ const markManualReplayFailed = async (
   dependencies: DeliveryProcessorDependencies,
   input: {
     readonly job: DeliveryProcessorJob;
+    readonly correlationId: string;
     readonly completedAt: Date;
     readonly attemptNumber: number;
     readonly errorCode: string;
@@ -155,6 +168,7 @@ const markManualReplayFailed = async (
     input.completedAt,
     {
       queueJobId: input.job.id ?? null,
+      correlationId: input.correlationId,
       attemptNumber: input.attemptNumber,
       errorCode: input.errorCode,
       errorMessage: input.errorMessage
@@ -198,6 +212,7 @@ const handleSuccess = async (
   input: {
     readonly event: WebhookEvent;
     readonly job: DeliveryProcessorJob;
+    readonly correlationId: string;
     readonly attemptId: string;
     readonly attemptNumber: number;
     readonly jobAttemptNumber: number;
@@ -222,6 +237,7 @@ const handleSuccess = async (
     message: "Webhook event was delivered to the mock downstream target.",
     metadata: createSuccessMetadata({
       job: input.job,
+      correlationId: input.correlationId,
       attemptNumber: input.attemptNumber,
       jobAttemptNumber: input.jobAttemptNumber,
       httpStatusCode: input.result.httpStatusCode
@@ -231,6 +247,7 @@ const handleSuccess = async (
 
   await markManualReplayCompleted(dependencies, {
     job: input.job,
+    correlationId: input.correlationId,
     completedAt,
     attemptNumber: input.attemptNumber
   });
@@ -247,6 +264,7 @@ const handleRetryableFailure = async (
   input: {
     readonly event: WebhookEvent;
     readonly job: DeliveryProcessorJob;
+    readonly correlationId: string;
     readonly attemptId: string;
     readonly attemptNumber: number;
     readonly jobAttemptNumber: number;
@@ -301,6 +319,7 @@ const handleRetryableFailure = async (
 
   await markManualReplayFailed(dependencies, {
     job: input.job,
+    correlationId: input.correlationId,
     completedAt,
     attemptNumber: input.attemptNumber,
     errorCode: input.result.errorCode,
@@ -315,6 +334,7 @@ const handlePermanentFailure = async (
   input: {
     readonly event: WebhookEvent;
     readonly job: DeliveryProcessorJob;
+    readonly correlationId: string;
     readonly attemptId: string;
     readonly attemptNumber: number;
     readonly jobAttemptNumber: number;
@@ -345,6 +365,7 @@ const handlePermanentFailure = async (
 
   await markManualReplayFailed(dependencies, {
     job: input.job,
+    correlationId: input.correlationId,
     completedAt,
     attemptNumber: input.attemptNumber,
     errorCode: input.result.errorCode,
@@ -358,6 +379,17 @@ export const processDeliveryJob = async (
   dependencies: DeliveryProcessorDependencies,
   job: DeliveryProcessorJob
 ): Promise<DeliveryProcessorResult> => {
+  const correlationId = getCorrelationId(job);
+  const logger = dependencies.logger.child({
+    correlationId,
+    jobId: job.id,
+    eventId: job.data.eventId,
+    providerId: job.data.providerId,
+    externalEventId: job.data.externalEventId
+  });
+
+  logger.info("Delivery job processing started.");
+
   const event = await dependencies.webhookEvents.getById(job.data.eventId);
 
   if (!event) {
@@ -403,6 +435,7 @@ export const processDeliveryJob = async (
     message: "Worker started mock downstream delivery.",
     metadata: {
       queueJobId: job.id ?? null,
+      correlationId,
       attemptNumber,
       jobAttemptNumber,
       manualReplayId: job.data.manualReplayId ?? null,
@@ -419,21 +452,36 @@ export const processDeliveryJob = async (
   });
 
   if (deliveryResult.ok) {
-    return handleSuccess(dependencies, {
+    const result = await handleSuccess(dependencies, {
       event,
       job,
+      correlationId,
       attemptId: attemptResult.attempt.id,
       attemptNumber,
       jobAttemptNumber,
       startedAt,
       result: deliveryResult
     });
+
+    logger.info("Delivery job completed.", {
+      attemptNumber,
+      httpStatusCode: deliveryResult.httpStatusCode
+    });
+
+    return result;
   }
 
   if (deliveryResult.retryable) {
+    logger.warn("Delivery job failed retryably.", {
+      attemptNumber,
+      errorCode: deliveryResult.errorCode,
+      httpStatusCode: deliveryResult.httpStatusCode
+    });
+
     return handleRetryableFailure(dependencies, {
       event,
       job,
+      correlationId,
       attemptId: attemptResult.attempt.id,
       attemptNumber,
       jobAttemptNumber,
@@ -445,6 +493,7 @@ export const processDeliveryJob = async (
   return handlePermanentFailure(dependencies, {
     event,
     job,
+    correlationId,
     attemptId: attemptResult.attempt.id,
     attemptNumber,
     jobAttemptNumber,

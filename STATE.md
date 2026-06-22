@@ -9,9 +9,9 @@
 - Contributors: Codex
 - Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
 - Current branch: `main`
-- Current phase: Phase 6 — Webhook simulator and failure scenarios
+- Current phase: Phase 7 — Reliability hardening validation closure
 - Overall status: green
-- Quality gate status: green; Phase 6 validation passed (`pnpm build` n/a)
+- Quality gate status: green; Phase 7 automated and manual runtime validation passed
 - Completion: 100%
 - Main blocker: none
 
@@ -25,19 +25,19 @@
 
 ## 1. Current objective
 
-- Phase objective: Make the local webhook demo repeatable with deterministic simulator commands and demo documentation.
+- Phase objective: Close Phase 7 reliability hardening by documenting validation results, required local env values, manual runtime checks, and troubleshooting.
 - Deadline / target date: none
-- Definition of done: Simulator commands cover valid, duplicate, rejected, retry, dead-letter, permanent-failure, and manual replay scenarios; README/docs explain the local demo; tests cover simulator builders and helpers.
-- Primary user-visible signal: `pnpm simulator:all` runs a clean local demo and the dashboard shows received, rejected, retried, dead-lettered, and replayed events.
-- Secondary checks: Docker Postgres/Redis, `pnpm install`, Drizzle generate/migrate/reset, Vitest, Prettier, ESLint, TypeScript, simulator smoke checks, and `git status --short`.
+- Definition of done: STATE, README, manual verification checklist, and reliability hardening docs record the accepted Phase 7 gates, runtime verification, required env vars, env-related failure findings, and remaining limitations.
+- Primary user-visible signal: A local user can follow the docs with `.env.example` values, start Docker/Postgres/Redis/API/worker, verify `/readyz` and `/dashboard`, and run `pnpm simulator:all` successfully.
+- Secondary checks: `pnpm format:check`, docs diff review, `git status --short`, and optional lint/typecheck/test skip reasons for this docs-only cleanup.
 - Out of scope: GitHub Actions, commits, pushes, tags, deployment, frontend frameworks, provider SDKs, real provider APIs, public tunnels, and paid API usage.
 
 ## 2. Status snapshot
 
-- Summary: Phase 6 simulator, demo docs, local queue reset helper, and manual-replay demo behavior are implemented and validated.
-- Since last update: Added simulator CLI, scenario payload/signing helpers, simulator tests, root simulator/demo scripts, docs, README Phase 6 demo section, local BullMQ queue reset, and `fail-until-manual-replay-success` worker behavior.
-- Current focus: User review and manual commit when ready.
-- Main uncertainty: none known for Phase 6 validation.
+- Summary: Phase 7 reliability hardening is accepted/complete; validation evidence and required local env setup are now being recorded in project docs/state.
+- Since last update: Phase 7 added error taxonomy, config validation helpers, correlation IDs, structured logger, redaction, API/worker/env readiness checks, safe JSON errors, `/readyz`, bounded webhook body reads, local rate limiting, enqueue failure handling, correlation-aware worker logs, graceful shutdown bounds, and simulator readiness/correlation output.
+- Current focus: Documentation/state cleanup only; user review and manual commit when ready.
+- Main uncertainty: none known for Phase 7 validation.
 
 ## 3. Completed phases / milestones
 
@@ -52,6 +52,7 @@
 | Phase 4.2 — QA recording   | 2026-06-21 | Docs-only recording of provided Phase 4 manual webhook E2E QA evidence and skip reasons.               | green        | none        |
 | Phase 5 — Dashboard/replay | 2026-06-21 | Hono dashboard, dashboard JSON endpoints, manual replay audit, replay queue jobs, and worker replay.   | green        | none        |
 | Phase 6 — Simulator/demo   | 2026-06-22 | Repeatable local simulator commands, failure scenario docs, queue reset, and replay demo behavior.     | green        | none        |
+| Phase 7 — Reliability      | 2026-06-22 | Config validation, correlation IDs, safe errors, readiness, rate/body limits, redaction, and shutdown. | green        | none        |
 
 ## 4. Completed since last update
 
@@ -74,53 +75,99 @@
 - 2026-06-22: Implemented Phase 6 simulator/demo behavior — evidence: `tools/simulator/src`, `tools/simulator/test`, root simulator scripts, `docs/demo-script.md`, `docs/failure-scenarios.md`, `docs/manual-verification-checklist.md`, README Phase 6 docs, local queue reset script, and worker replay-demo behavior.
 - 2026-06-22: Completed non-Docker Phase 6 validation — evidence: `pnpm install`, `pnpm db:generate`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, simulator tests, non-Redis/non-Postgres Vitest slice, and API-unreachable simulator smoke check.
 - 2026-06-22: Completed Phase 6 validation — evidence: `pnpm install`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, Docker-backed PostgreSQL/Redis/API/worker/simulator validation, and manual dashboard verification passed; `pnpm build` was skipped/not applicable because no root `build` script exists (`Command "build" not found`); no commit, push, tag, or remote changes were made.
+- 2026-06-22: Implemented Phase 7 reliability hardening — evidence: core error taxonomy, config validation helpers, correlation IDs, structured logger, secret redaction, API env validation, `x-request-id` middleware, safe JSON errors with `correlationId`, `/readyz`, bounded webhook body reader, local webhook rate limiter, queue enqueue failure handling, queue/DB URL validation and readiness helpers, worker config/readiness checks, correlation-aware worker logs, timeout-bounded graceful shutdown, and simulator `/readyz` preflight/correlation output.
+- 2026-06-22: Accepted Phase 7 validation closure — evidence: automated gates passed (`pnpm install`, `pnpm db:generate`, `pnpm db:migrate`, `pnpm format`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`); manual runtime verification passed with Docker PostgreSQL/Redis, `pnpm dev:api`, `pnpm dev:worker`, HTTP 200 from `/readyz` and `/dashboard`, and successful `pnpm simulator:all`.
+- 2026-06-22: Recorded Phase 7 env findings — evidence: local runtime requires exact `.env.example` values for `DATABASE_URL`, `REDIS_URL`, and `STRIPE_SAMPLE_WEBHOOK_SECRET`; earlier manual failures were caused by missing or incorrect local environment variables, not Phase 7 implementation defects.
 
 ## 5. Changed files
 
-| Path                                                              | Purpose                              | Status  | Notes                                                                                                            |
-| ----------------------------------------------------------------- | ------------------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------- |
-| `package.json`, `pnpm-workspace.yaml`                             | Root pnpm workspace and scripts      | created | No runtime app dependencies added.                                                                               |
-| `tsconfig.base.json`, `tsconfig.json`                             | TypeScript baseline                  | created | ESM-oriented Node TypeScript config.                                                                             |
-| `eslint.config.js`, `.prettierrc.json`                            | Lint and format tooling              | created | ESLint flat config and Prettier config.                                                                          |
-| `.gitignore`, `.editorconfig`, `.env.example`                     | Local repository defaults            | created | `.env.example` contains fake values only.                                                                        |
-| `apps/*`, `packages/*`, `tools/simulator`                         | Future workspace package directories | created | Package manifests only; no source code.                                                                          |
-| `infra/docker-compose.yml`                                        | Local PostgreSQL and Redis services  | created | Named volumes and health checks.                                                                                 |
-| `README.md`, `CONTEXT.md`, `RUNBOOK.md`                           | Setup and workflow documentation     | updated | Phase 0 commands and constraints.                                                                                |
-| `REQ.md`, `DESIGN.md`, `TDD.md`, `STATE.md`                       | Existing templates                   | updated | Formatted by Prettier.                                                                                           |
-| `packages/core/src`                                               | Core domain contracts                | created | Pure TypeScript only; no ingress, DB, queue, or provider SDK.                                                    |
-| `packages/core/test`                                              | Core unit tests                      | created | Covers provider IDs, statuses, schemas, retry policy, adapters, and fake signature verification.                 |
-| `packages/core/package.json`, `pnpm-lock.yaml`                    | Core dependency metadata             | updated | Adds `zod` scoped to `@webhook-monitor/core`.                                                                    |
-| `drizzle.config.ts`                                               | Drizzle Kit config                   | created | Used by db package scripts; reads `.env` or fake local `.env.example` values.                                    |
-| `packages/db/src`                                                 | Persistence implementation           | created | Schema, client, migration runner, repositories, reset/seed helpers, and local safety checks.                     |
-| `packages/db/drizzle`                                             | Generated migrations                 | created | Initial Drizzle migration and metadata for Phase 2 tables/enums/indexes.                                         |
-| `packages/db/test`                                                | DB integration tests                 | created | Covers migrations, repositories, idempotency, history, attempts, dead letters, replays, safety.                  |
-| `packages/db/package.json`, `pnpm-lock.yaml`                      | DB dependencies and scripts          | updated | Adds Drizzle, postgres.js, dotenv, drizzle-kit, tsx, and `@webhook-monitor/core`.                                |
-| `.env.example`, `README.md`                                       | Local env/docs                       | updated | Adds `POSTGRES_PORT` and Phase 2 local database instructions.                                                    |
-| `apps/api/src`                                                    | Hono API implementation              | created | App factory, server, config, routes, ingest service, rejection handling, and test harness.                       |
-| `apps/api/test`                                                   | API integration tests                | created | Covers health, valid providers, signatures, invalid inputs, idempotency, and unsupported provider.               |
-| `packages/queue/src`                                              | Queue placeholder port               | created | Dependency-free `DeliveryQueuePort` and no-op implementation; no BullMQ or Redis behavior.                       |
-| `packages/db/src/repositories/webhook-events.ts`                  | Phase 3 persistence helper           | updated | Adds idempotent create with initial status history for API ingress.                                              |
-| `package.json`, `apps/api/package.json`                           | API scripts and dependencies         | updated | Adds `dev:api`, API package scripts, Hono, node-server adapter, workspace deps, and `tsx`.                       |
-| `.env.example`, `README.md`, `STATE.md`                           | Phase 3 local docs/status            | updated | Adds API port/host, fake Stripe sample secret, manual API examples, and validation state.                        |
-| `packages/db/package.json`, `packages/db/src/test-utils/index.ts` | DB test utility export               | updated | Exposes Phase 2 database test helpers for API integration tests.                                                 |
-| `vitest.config.ts`                                                | Test runner stability                | updated | Disables file parallelism to prevent shared local DB cleanup races.                                              |
-| `packages/queue/src`, `packages/queue/test`                       | BullMQ queue boundary                | updated | Adds delivery job contract, Redis helpers, stable job IDs, retry/backoff mapping, worker factory, and tests.     |
-| `apps/worker/src`, `apps/worker/test`, `apps/worker/package.json` | Worker runtime                       | created | Adds worker config, processor, mock downstream client, graceful shutdown, BullMQ integration tests, and scripts. |
-| `apps/api/src`, `apps/api/test`                                   | API queue wiring                     | updated | Runtime uses BullMQ queue; tests retain injectable fake queue and no-enqueue assertions.                         |
-| `packages/db/src/repositories`, `packages/db/test`                | Worker persistence helpers           | updated | Adds idempotent delivery-attempt and dead-letter helpers with tests; no schema migration needed.                 |
-| `.env.example`, `README.md`, `STATE.md`                           | Phase 4 local docs/status            | updated | Adds fake worker/retry/mock downstream values and manual Phase 4 verification instructions.                      |
-| `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`           | Phase 4 scripts/dependencies         | updated | Adds BullMQ/ioredis/zod queue dependencies, worker scripts, and explicit pnpm build policy.                      |
-| `README.md`, `STATE.md`                                           | Phase 4.1 verification docs/status   | updated | Clarifies manual webhook E2E QA, SQL inspection, and validation categories; no product code changes.             |
-| `README.md`, `STATE.md`                                           | Phase 4.2 manual QA evidence record  | updated | Docs-only patch recording provided manual QA evidence and skip reasons; no product/test/dependency changes.      |
-| `apps/api/src/dashboard`, `apps/api/test/dashboard.test.ts`       | Phase 5 dashboard routes and tests   | updated | Server-rendered Hono dashboard, JSON endpoints, safe HTML rendering, and replay route tests.                     |
-| `packages/db/src/repositories/dashboard.ts`, db repository tests  | Phase 5 dashboard persistence APIs   | updated | Summary/list/detail/dead-letter queries, replay eligibility, replay audit creation, and metric tests.            |
-| `packages/queue`, `apps/worker`                                   | Phase 5 replay queue/worker support  | updated | Replay job metadata/IDs and worker replay success/failure audit behavior.                                        |
-| `README.md`, `STATE.md`                                           | Phase 5 manual QA docs record        | updated | Docs-only validation patch; no runtime code, tests, dependencies, migrations, workspace, or infra changes.       |
-| `STATE.md`                                                        | Phase 6 validation evidence          | updated | Docs/state-only patch records Phase 6 gate pass evidence, `pnpm build` n/a, and no Git history/remote actions.   |
+| Path                                                                                              | Purpose                              | Status  | Notes                                                                                                                    |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `package.json`, `pnpm-workspace.yaml`                                                             | Root pnpm workspace and scripts      | created | No runtime app dependencies added.                                                                                       |
+| `tsconfig.base.json`, `tsconfig.json`                                                             | TypeScript baseline                  | created | ESM-oriented Node TypeScript config.                                                                                     |
+| `eslint.config.js`, `.prettierrc.json`                                                            | Lint and format tooling              | created | ESLint flat config and Prettier config.                                                                                  |
+| `.gitignore`, `.editorconfig`, `.env.example`                                                     | Local repository defaults            | created | `.env.example` contains fake values only.                                                                                |
+| `apps/*`, `packages/*`, `tools/simulator`                                                         | Future workspace package directories | created | Package manifests only; no source code.                                                                                  |
+| `infra/docker-compose.yml`                                                                        | Local PostgreSQL and Redis services  | created | Named volumes and health checks.                                                                                         |
+| `README.md`, `CONTEXT.md`, `RUNBOOK.md`                                                           | Setup and workflow documentation     | updated | Phase 0 commands and constraints.                                                                                        |
+| `REQ.md`, `DESIGN.md`, `TDD.md`, `STATE.md`                                                       | Existing templates                   | updated | Formatted by Prettier.                                                                                                   |
+| `packages/core/src`                                                                               | Core domain contracts                | created | Pure TypeScript only; no ingress, DB, queue, or provider SDK.                                                            |
+| `packages/core/test`                                                                              | Core unit tests                      | created | Covers provider IDs, statuses, schemas, retry policy, adapters, and fake signature verification.                         |
+| `packages/core/package.json`, `pnpm-lock.yaml`                                                    | Core dependency metadata             | updated | Adds `zod` scoped to `@webhook-monitor/core`.                                                                            |
+| `drizzle.config.ts`                                                                               | Drizzle Kit config                   | created | Used by db package scripts; reads `.env` or fake local `.env.example` values.                                            |
+| `packages/db/src`                                                                                 | Persistence implementation           | created | Schema, client, migration runner, repositories, reset/seed helpers, and local safety checks.                             |
+| `packages/db/drizzle`                                                                             | Generated migrations                 | created | Initial Drizzle migration and metadata for Phase 2 tables/enums/indexes.                                                 |
+| `packages/db/test`                                                                                | DB integration tests                 | created | Covers migrations, repositories, idempotency, history, attempts, dead letters, replays, safety.                          |
+| `packages/db/package.json`, `pnpm-lock.yaml`                                                      | DB dependencies and scripts          | updated | Adds Drizzle, postgres.js, dotenv, drizzle-kit, tsx, and `@webhook-monitor/core`.                                        |
+| `.env.example`, `README.md`                                                                       | Local env/docs                       | updated | Adds `POSTGRES_PORT` and Phase 2 local database instructions.                                                            |
+| `apps/api/src`                                                                                    | Hono API implementation              | created | App factory, server, config, routes, ingest service, rejection handling, and test harness.                               |
+| `apps/api/test`                                                                                   | API integration tests                | created | Covers health, valid providers, signatures, invalid inputs, idempotency, and unsupported provider.                       |
+| `packages/queue/src`                                                                              | Queue placeholder port               | created | Dependency-free `DeliveryQueuePort` and no-op implementation; no BullMQ or Redis behavior.                               |
+| `packages/db/src/repositories/webhook-events.ts`                                                  | Phase 3 persistence helper           | updated | Adds idempotent create with initial status history for API ingress.                                                      |
+| `package.json`, `apps/api/package.json`                                                           | API scripts and dependencies         | updated | Adds `dev:api`, API package scripts, Hono, node-server adapter, workspace deps, and `tsx`.                               |
+| `.env.example`, `README.md`, `STATE.md`                                                           | Phase 3 local docs/status            | updated | Adds API port/host, fake Stripe sample secret, manual API examples, and validation state.                                |
+| `packages/db/package.json`, `packages/db/src/test-utils/index.ts`                                 | DB test utility export               | updated | Exposes Phase 2 database test helpers for API integration tests.                                                         |
+| `vitest.config.ts`                                                                                | Test runner stability                | updated | Disables file parallelism to prevent shared local DB cleanup races.                                                      |
+| `packages/queue/src`, `packages/queue/test`                                                       | BullMQ queue boundary                | updated | Adds delivery job contract, Redis helpers, stable job IDs, retry/backoff mapping, worker factory, and tests.             |
+| `apps/worker/src`, `apps/worker/test`, `apps/worker/package.json`                                 | Worker runtime                       | created | Adds worker config, processor, mock downstream client, graceful shutdown, BullMQ integration tests, and scripts.         |
+| `apps/api/src`, `apps/api/test`                                                                   | API queue wiring                     | updated | Runtime uses BullMQ queue; tests retain injectable fake queue and no-enqueue assertions.                                 |
+| `packages/db/src/repositories`, `packages/db/test`                                                | Worker persistence helpers           | updated | Adds idempotent delivery-attempt and dead-letter helpers with tests; no schema migration needed.                         |
+| `.env.example`, `README.md`, `STATE.md`                                                           | Phase 4 local docs/status            | updated | Adds fake worker/retry/mock downstream values and manual Phase 4 verification instructions.                              |
+| `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`                                           | Phase 4 scripts/dependencies         | updated | Adds BullMQ/ioredis/zod queue dependencies, worker scripts, and explicit pnpm build policy.                              |
+| `README.md`, `STATE.md`                                                                           | Phase 4.1 verification docs/status   | updated | Clarifies manual webhook E2E QA, SQL inspection, and validation categories; no product code changes.                     |
+| `README.md`, `STATE.md`                                                                           | Phase 4.2 manual QA evidence record  | updated | Docs-only patch recording provided manual QA evidence and skip reasons; no product/test/dependency changes.              |
+| `apps/api/src/dashboard`, `apps/api/test/dashboard.test.ts`                                       | Phase 5 dashboard routes and tests   | updated | Server-rendered Hono dashboard, JSON endpoints, safe HTML rendering, and replay route tests.                             |
+| `packages/db/src/repositories/dashboard.ts`, db repository tests                                  | Phase 5 dashboard persistence APIs   | updated | Summary/list/detail/dead-letter queries, replay eligibility, replay audit creation, and metric tests.                    |
+| `packages/queue`, `apps/worker`                                                                   | Phase 5 replay queue/worker support  | updated | Replay job metadata/IDs and worker replay success/failure audit behavior.                                                |
+| `README.md`, `STATE.md`                                                                           | Phase 5 manual QA docs record        | updated | Docs-only validation patch; no runtime code, tests, dependencies, migrations, workspace, or infra changes.               |
+| `STATE.md`                                                                                        | Phase 6 validation evidence          | updated | Docs/state-only patch records Phase 6 gate pass evidence, `pnpm build` n/a, and no Git history/remote actions.           |
+| `README.md`, `docs/manual-verification-checklist.md`, `docs/reliability-hardening.md`, `STATE.md` | Phase 7 validation closure           | updated | Docs/state-only cleanup records passed gates, manual runtime verification, required env values, and env troubleshooting. |
 
 ## 6. Validation and quality gates
 
 ### Required gates
+
+### Phase 7 reliability hardening validation
+
+| Gate               | Command / check                                                     | Status | Evidence / notes                                                                                  |
+| ------------------ | ------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------- |
+| install            | `pnpm install`                                                      | pass   | Completed during Phase 7 validation.                                                              |
+| migration generate | `pnpm db:generate`                                                  | pass   | Completed during Phase 7 validation.                                                              |
+| migration apply    | `pnpm db:migrate`                                                   | pass   | Requires `DATABASE_URL` to match the local Docker Postgres credentials from `.env.example`.       |
+| format write       | `pnpm format`                                                       | pass   | Completed during Phase 7 validation.                                                              |
+| format check       | `pnpm format:check`                                                 | pass   | Completed during Phase 7 validation.                                                              |
+| lint               | `pnpm lint`                                                         | pass   | Completed during Phase 7 validation.                                                              |
+| typecheck          | `pnpm typecheck`                                                    | pass   | Completed during Phase 7 validation.                                                              |
+| tests              | `pnpm test -- --run`                                                | pass   | Completed during Phase 7 validation.                                                              |
+| Docker services    | `docker compose -f .\infra\docker-compose.yml up -d postgres redis` | pass   | Local PostgreSQL and Redis started successfully.                                                  |
+| API runtime        | `pnpm dev:api`                                                      | pass   | Started successfully with `DATABASE_URL`, `REDIS_URL`, and `STRIPE_SAMPLE_WEBHOOK_SECRET` loaded. |
+| Worker runtime     | `pnpm dev:worker`                                                   | pass   | Started successfully with `DATABASE_URL` and `REDIS_URL` loaded.                                  |
+| readiness endpoint | `curl.exe -i ... http://localhost:3000/readyz`                      | pass   | Returned HTTP `200`.                                                                              |
+| dashboard endpoint | `curl.exe -i ... http://localhost:3000/dashboard`                   | pass   | Returned HTTP `200`.                                                                              |
+| simulator full run | `pnpm simulator:all`                                                | pass   | Completed successfully after API restart with `STRIPE_SAMPLE_WEBHOOK_SECRET` loaded.              |
+| Git safety         | commit/push/tag/remote changes                                      | n/a    | No commit, push, tag, or remote changes were made.                                                |
+
+### Phase 7 env requirements and findings
+
+| Item                           | Status                                      | Evidence / notes                                                                                                                        |
+| ------------------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                 | required                                    | Use exact `.env.example` value: `postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor`.                   |
+| `REDIS_URL`                    | required                                    | Use exact `.env.example` value: `redis://localhost:6379`.                                                                               |
+| `STRIPE_SAMPLE_WEBHOOK_SECRET` | required for simulator/webhook verification | Use exact `.env.example` value: `whsec_local_test_secret`; restart the API after setting it.                                            |
+| Missing API env vars           | verified                                    | `pnpm dev:api` fails with `ConfigValidationError` when `DATABASE_URL` or `REDIS_URL` is missing.                                        |
+| Wrong database credentials     | verified                                    | `pnpm db:migrate` and `pnpm dev:worker` fail when `DATABASE_URL` does not match local Postgres credentials.                             |
+| Missing API signature secret   | verified                                    | `pnpm simulator:all` fails with `misconfigured_signature_secret` when the API process lacks `STRIPE_SAMPLE_WEBHOOK_SECRET`.             |
+| Earlier manual failures        | resolved                                    | Failures were caused by missing or incorrect local environment variables, not Phase 7 implementation defects.                           |
+| Remaining limitation           | accepted                                    | Webhook rate limiting is in-memory and API-process-local; dashboard remains unauthenticated/local-only; no real provider APIs are used. |
+
+### Phase 7 optional / skipped gates
+
+| Gate                    | Status  | Reason                                                                                              | Follow-up                                                                 |
+| ----------------------- | ------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| production deployment   | skipped | Explicitly out of scope; no deployment, public tunnel, process manager, or hosted infrastructure.   | Revisit only in an approved later phase.                                  |
+| GitHub Actions          | skipped | Explicitly out of scope; local validation remains the default.                                      | Add only if explicitly requested in a later phase.                        |
+| external observability  | skipped | Explicitly out of scope; no vendor SDKs or hosted services added.                                   | Revisit only with approved production-readiness scope.                    |
+| real provider API calls | skipped | Mock/no-paid-API mode remains required; no real Stripe, Shopify, Calendly, HubSpot, or CRM secrets. | Use fake local provider data until real API usage is explicitly approved. |
 
 ### Phase 6 simulator/demo validation
 
@@ -345,10 +392,10 @@
 
 ## 7. Active tasks
 
-| ID       | Priority | Task                                      | Owner | Status | ETA  | Notes                             |
-| -------- | -------- | ----------------------------------------- | ----- | ------ | ---- | --------------------------------- |
-| TASK-001 | P1       | Review Phase 6 validation evidence patch. | User  | todo   | none | Do not commit or push from Codex. |
-| TASK-002 | P2       | Commit manually when ready.               | User  | todo   | none | Codex must not commit or push.    |
+| ID       | Priority | Task                                        | Owner | Status | ETA  | Notes                             |
+| -------- | -------- | ------------------------------------------- | ----- | ------ | ---- | --------------------------------- |
+| TASK-001 | P1       | Review Phase 7 documentation/state cleanup. | User  | todo   | none | Do not commit or push from Codex. |
+| TASK-002 | P2       | Commit manually when ready.                 | User  | todo   | none | Codex must not commit or push.    |
 
 ## 8. Backlog / long horizon
 
@@ -360,7 +407,7 @@
 
 | ID        | Issue                               | Severity | Owner / layer | Next action                | Target |
 | --------- | ----------------------------------- | -------- | ------------- | -------------------------- | ------ |
-| ISSUE-001 | No known Phase 6 validation issues. | low      | n/a           | Continue with user review. | none   |
+| ISSUE-001 | No known Phase 7 validation issues. | low      | n/a           | Continue with user review. | none   |
 
 ## 10. Risks
 
@@ -371,18 +418,19 @@
 
 ## 11. Decisions since last update
 
-| ID      | Date       | Decision                                                               | Rationale                                                                                       | Tradeoff / consequence                                                 |
-| ------- | ---------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| DEC-001 | 2026-06-20 | Use pnpm workspace with local-only tooling.                            | Matches requested stack and phase gating.                                                       | Runtime dependencies deferred to later phases.                         |
-| DEC-002 | 2026-06-20 | Use Docker Compose for PostgreSQL and Redis.                           | Matches future architecture requirements.                                                       | Validation requires Docker Desktop to be running.                      |
-| DEC-003 | 2026-06-20 | Keep real provider APIs disabled by default.                           | Prevents paid/credentialed API use locally.                                                     | Later phases must use mocks unless approved.                           |
-| DEC-004 | 2026-06-20 | Use Hono for Phase 3 ingress.                                          | Matches requested stack and keeps tests serverless via `app.request()`.                         | Dashboard/UI remains deferred.                                         |
-| DEC-005 | 2026-06-20 | Keep queue as a placeholder port only.                                 | Preserves Phase 3 boundary and prepares Phase 4 replacement.                                    | No Redis/BullMQ behavior yet.                                          |
-| DEC-006 | 2026-06-21 | Use BullMQ with stable job IDs and capped custom backoff for Phase 4.  | Matches requested queue/worker stack and keeps retry policy configurable from local env.        | BullMQ rejects `:` in custom IDs, so job IDs use `delivery-<eventId>`. |
-| DEC-007 | 2026-06-21 | Keep downstream delivery payload-driven and local-only.                | Demonstrates success, retry, permanent failure, and dead-letter behavior without external APIs. | Real provider delivery remains deferred.                               |
-| DEC-008 | 2026-06-21 | Keep Phase 5 dashboard server-rendered and local-demo unauthenticated. | Matches phase constraints and avoids frontend framework/auth scope creep.                       | Do not expose the dashboard publicly without later auth hardening.     |
-| DEC-009 | 2026-06-22 | Build the simulator as a local TypeScript CLI under `tools/simulator`. | Reuses current pnpm/tsx/Vitest tooling and avoids provider SDKs or paid APIs.                   | Full scenario smoke requires local API, worker, PostgreSQL, and Redis. |
-| DEC-010 | 2026-06-22 | Make `demo:reset` clear DB tables and the local BullMQ queue.          | Repeatable demos need clean persistence and queue state.                                        | Reset remains local-only and refuses non-local targets.                |
+| ID      | Date       | Decision                                                               | Rationale                                                                                       | Tradeoff / consequence                                                                    |
+| ------- | ---------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| DEC-001 | 2026-06-20 | Use pnpm workspace with local-only tooling.                            | Matches requested stack and phase gating.                                                       | Runtime dependencies deferred to later phases.                                            |
+| DEC-002 | 2026-06-20 | Use Docker Compose for PostgreSQL and Redis.                           | Matches future architecture requirements.                                                       | Validation requires Docker Desktop to be running.                                         |
+| DEC-003 | 2026-06-20 | Keep real provider APIs disabled by default.                           | Prevents paid/credentialed API use locally.                                                     | Later phases must use mocks unless approved.                                              |
+| DEC-004 | 2026-06-20 | Use Hono for Phase 3 ingress.                                          | Matches requested stack and keeps tests serverless via `app.request()`.                         | Dashboard/UI remains deferred.                                                            |
+| DEC-005 | 2026-06-20 | Keep queue as a placeholder port only.                                 | Preserves Phase 3 boundary and prepares Phase 4 replacement.                                    | No Redis/BullMQ behavior yet.                                                             |
+| DEC-006 | 2026-06-21 | Use BullMQ with stable job IDs and capped custom backoff for Phase 4.  | Matches requested queue/worker stack and keeps retry policy configurable from local env.        | BullMQ rejects `:` in custom IDs, so job IDs use `delivery-<eventId>`.                    |
+| DEC-007 | 2026-06-21 | Keep downstream delivery payload-driven and local-only.                | Demonstrates success, retry, permanent failure, and dead-letter behavior without external APIs. | Real provider delivery remains deferred.                                                  |
+| DEC-008 | 2026-06-21 | Keep Phase 5 dashboard server-rendered and local-demo unauthenticated. | Matches phase constraints and avoids frontend framework/auth scope creep.                       | Do not expose the dashboard publicly without later auth hardening.                        |
+| DEC-009 | 2026-06-22 | Build the simulator as a local TypeScript CLI under `tools/simulator`. | Reuses current pnpm/tsx/Vitest tooling and avoids provider SDKs or paid APIs.                   | Full scenario smoke requires local API, worker, PostgreSQL, and Redis.                    |
+| DEC-010 | 2026-06-22 | Make `demo:reset` clear DB tables and the local BullMQ queue.          | Repeatable demos need clean persistence and queue state.                                        | Reset remains local-only and refuses non-local targets.                                   |
+| DEC-011 | 2026-06-22 | Treat exact `.env.example` values as the manual runtime contract.      | Phase 7 validation showed runtime failures were env setup issues, not implementation defects.   | PowerShell env vars must be set per terminal and API must be restarted after env changes. |
 
 ## 12. Open questions
 
@@ -392,15 +440,15 @@
 
 ## 13. Next 3 actions
 
-1. User: Review the Phase 6 validation evidence patch — expected result: docs/state wording matches the completed local validation.
-2. User: Commit manually when ready — expected result: Phase 6 simulator/demo behavior captured in Git history.
+1. User: Review the Phase 7 documentation/state cleanup — expected result: docs/state wording matches the accepted reliability hardening validation.
+2. User: Commit manually when ready — expected result: Phase 7 reliability hardening and documentation closure captured in Git history.
 3. User/Codex: Choose the next phase — expected result: scope remains phase-gated and local-first.
 
 ## 14. Handoff notes
 
 - Start here next: `TASK-001`
-- Read first: `README.md`, `docs/demo-script.md`, `tools/simulator/src/index.ts`, `tools/simulator/src/scenarios`, `packages/queue/src/scripts/reset.ts`, and `apps/worker/src/mock-downstream-client.ts`
-- Commands to run first for next-phase setup check: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`; `pnpm db:migrate`; `pnpm demo:reset`; `pnpm test`; `pnpm simulator:all`
+- Read first: `README.md`, `docs/reliability-hardening.md`, `docs/manual-verification-checklist.md`, `docs/demo-script.md`, and `STATE.md`
+- Commands to run first for next-phase setup check: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`; set the `.env.example` `DATABASE_URL`, `REDIS_URL`, and `STRIPE_SAMPLE_WEBHOOK_SECRET` values in the relevant PowerShell terminals; `pnpm db:migrate`; `pnpm test -- --run`; `pnpm simulator:all`
 - Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior outside the approved phase.
-- Watch for: next-phase scope creep and any request that would introduce real provider credentials, paid API usage, provider SDKs, or deployment automation before those are approved.
-- Suggested next prompt: `Start the next phase after reviewing Phase 6 validation and choosing the next phase scope.`
+- Watch for: next-phase scope creep, env drift from `.env.example`, and any request that would introduce real provider credentials, paid API usage, provider SDKs, or deployment automation before those are approved.
+- Suggested next prompt: `Start the next phase after reviewing Phase 7 reliability hardening documentation and choosing the next phase scope.`

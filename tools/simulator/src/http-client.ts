@@ -1,3 +1,5 @@
+import { createCorrelationId } from "@webhook-monitor/core";
+
 import type { SimulatorConfig } from "./config.js";
 
 export interface SimulatorHttpRequest {
@@ -10,6 +12,7 @@ export interface SimulatorHttpRequest {
 export interface SimulatorHttpResponse {
   readonly status: number;
   readonly ok: boolean;
+  readonly headers: Record<string, string>;
   readonly bodyText: string;
   readonly body: unknown;
 }
@@ -21,7 +24,7 @@ export interface SimulatorHttpClient {
 export type FetchLike = (
   input: string,
   init: RequestInit
-) => Promise<Pick<Response, "status" | "ok" | "text">>;
+) => Promise<Pick<Response, "status" | "ok" | "headers" | "text">>;
 
 export class SimulatorHttpError extends Error {
   constructor(message: string) {
@@ -81,19 +84,28 @@ export const createSimulatorHttpClient = (
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
     const url = `${config.apiBaseUrl}${input.path}`;
+    const headers = {
+      ...input.headers,
+      "x-request-id": input.headers?.["x-request-id"] ?? createCorrelationId()
+    };
 
     try {
       const response = await fetchImpl(url, {
         method: input.method,
-        headers: input.headers,
+        headers,
         body: input.body,
         signal: controller.signal
       });
       const bodyText = await response.text();
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
 
       return {
         status: response.status,
         ok: response.ok,
+        headers: responseHeaders,
         bodyText,
         body: parseJsonBody(bodyText)
       };

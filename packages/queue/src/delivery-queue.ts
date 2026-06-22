@@ -1,7 +1,12 @@
 import { Queue } from "bullmq";
 import type { Redis } from "ioredis";
+import { OperationalError, type RetryPolicy } from "@webhook-monitor/core";
 
-import { closeRedisConnection, createQueueRedisConnection } from "./connection.js";
+import {
+  checkRedisConnection,
+  closeRedisConnection,
+  createQueueRedisConnection
+} from "./connection.js";
 import {
   createDeliveryJobData,
   createDeliveryQueueJobId,
@@ -12,7 +17,6 @@ import {
 } from "./delivery-job.js";
 import { deliveryJobName, webhookDeliveryQueueName } from "./names.js";
 import { createDeliveryJobOptions, createRetryPolicyFromEnv } from "./retry-options.js";
-import type { RetryPolicy } from "@webhook-monitor/core";
 
 export interface CreateBullMqDeliveryQueueOptions {
   readonly queueName?: string;
@@ -48,10 +52,20 @@ export class BullMqDeliveryQueue implements DeliveryQueuePort {
   async enqueueDelivery(input: EnqueueDeliveryInput): Promise<EnqueueDeliveryResult> {
     const data = createDeliveryJobData(input, this.clock);
     const jobId = createDeliveryQueueJobId(data);
-    const job = await this.queue.add(deliveryJobName, data, {
-      ...createDeliveryJobOptions(this.retryPolicy),
-      jobId
-    });
+
+    let job: Awaited<ReturnType<Queue<DeliveryJobData>["add"]>>;
+
+    try {
+      job = await this.queue.add(deliveryJobName, data, {
+        ...createDeliveryJobOptions(this.retryPolicy),
+        jobId
+      });
+    } catch (cause) {
+      throw new OperationalError({
+        code: "queue_enqueue_failed",
+        cause
+      });
+    }
 
     return {
       queued: true,
@@ -59,11 +73,22 @@ export class BullMqDeliveryQueue implements DeliveryQueuePort {
     };
   }
 
-  async close(): Promise<void> {
-    await this.queue.close();
+  async checkReadiness(): Promise<void> {
+    await checkRedisConnection(this.connection);
+  }
 
-    if (this.ownsConnection) {
-      await closeRedisConnection(this.connection);
+  async close(): Promise<void> {
+    try {
+      await this.queue.close();
+
+      if (this.ownsConnection) {
+        await closeRedisConnection(this.connection);
+      }
+    } catch (cause) {
+      throw new OperationalError({
+        code: "queue_shutdown_failed",
+        cause
+      });
     }
   }
 }

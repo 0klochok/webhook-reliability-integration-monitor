@@ -6,6 +6,7 @@ export const deliveryJobSchema = z
     eventId: z.string().uuid(),
     providerId: providerIdSchema.optional(),
     externalEventId: z.string().min(1).optional(),
+    correlationId: z.string().min(1).max(128).optional(),
     enqueuedAt: z.string().datetime(),
     replayOfEventId: z.string().uuid().optional(),
     manualReplayId: z.string().uuid().optional(),
@@ -20,6 +21,7 @@ export interface EnqueueDeliveryInput {
   readonly eventId: string;
   readonly providerId?: ProviderId;
   readonly externalEventId?: string;
+  readonly correlationId?: string;
   readonly enqueuedAt?: Date | string;
   readonly replayOfEventId?: string;
   readonly manualReplayId?: string;
@@ -34,6 +36,8 @@ export interface EnqueueDeliveryResult {
 
 export interface DeliveryQueuePort {
   enqueueDelivery(input: EnqueueDeliveryInput): Promise<EnqueueDeliveryResult>;
+  checkReadiness?(): Promise<void>;
+  close?(): Promise<void>;
 }
 
 export const createDeliveryJobId = (eventId: string): string => `delivery-${eventId}`;
@@ -55,17 +59,23 @@ const toIsoString = (value: Date | string): string =>
 export const createDeliveryJobData = (
   input: EnqueueDeliveryInput,
   clock: () => Date = () => new Date()
-): DeliveryJobData =>
-  deliveryJobSchema.parse({
+): DeliveryJobData => {
+  const data = {
     eventId: input.eventId,
     providerId: input.providerId,
     externalEventId: input.externalEventId,
+    correlationId: input.correlationId,
     enqueuedAt: input.enqueuedAt ? toIsoString(input.enqueuedAt) : clock().toISOString(),
     replayOfEventId: input.replayOfEventId,
     manualReplayId: input.manualReplayId,
     requestedBy: input.requestedBy,
     initialAttemptNumber: input.initialAttemptNumber
-  });
+  };
+
+  return deliveryJobSchema.parse(
+    Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined))
+  );
+};
 
 export const parseDeliveryJobData = (input: unknown): DeliveryJobData =>
   deliveryJobSchema.parse(input);

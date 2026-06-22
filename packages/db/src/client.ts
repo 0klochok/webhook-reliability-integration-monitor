@@ -1,4 +1,5 @@
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { OperationalError } from "@webhook-monitor/core";
 import postgres, { type Sql } from "postgres";
 
 import { resolveDatabaseUrl, type DatabaseUrlOptions } from "./env.js";
@@ -33,4 +34,15 @@ export const createDatabaseClient = (options: CreateDatabaseClientOptions = {}):
       await sql.end({ timeout: options.closeTimeoutSeconds ?? 5 });
     }
   };
+};
+
+export const checkDatabaseConnection = async (client: DatabaseClient): Promise<void> => {
+  try {
+    await client.sql`select 1 as ok`;
+  } catch (cause) {
+    throw new OperationalError({
+      code: "database_connection_failed",
+      cause
+    });
+  }
 };

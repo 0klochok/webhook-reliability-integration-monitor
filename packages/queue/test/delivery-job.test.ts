@@ -55,6 +55,23 @@ describe("delivery job contract", () => {
     expect(createDeliveryQueueJobId(data)).toBe(`delivery-replay-${manualReplayId}`);
   });
 
+  it("accepts optional correlation metadata without changing stable job ids", () => {
+    const eventId = "11111111-1111-4111-8111-111111111111";
+    const data = createDeliveryJobData({
+      eventId,
+      providerId: "generic-http",
+      externalEventId: "generic-event-1",
+      correlationId: "demo-correlation-123",
+      enqueuedAt: "2026-06-20T12:00:00.000Z"
+    });
+
+    expect(data).toMatchObject({
+      eventId,
+      correlationId: "demo-correlation-123"
+    });
+    expect(createDeliveryQueueJobId(data)).toBe(`delivery-${eventId}`);
+  });
+
   it("rejects invalid delivery job data", () => {
     const result = deliveryJobSchema.safeParse({
       eventId: "not-a-uuid",

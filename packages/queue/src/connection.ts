@@ -1,4 +1,5 @@
 import { Redis, type RedisOptions } from "ioredis";
+import { ConfigValidationError, OperationalError } from "@webhook-monitor/core";
 
 export interface ResolveRedisUrlOptions {
   readonly redisUrl?: string;
@@ -24,7 +25,7 @@ const normalizeHostname = (hostname: string): string => hostname.replace(/^\[(.*
 export const resolveRedisUrl = (options: ResolveRedisUrlOptions = {}): string => {
   const value =
     options.redisUrl?.trim() ?? options.env?.REDIS_URL?.trim() ?? process.env.REDIS_URL?.trim();
-  return value || options.fallbackUrl || "redis://localhost:6379";
+  return validateRedisUrl(value || options.fallbackUrl || "redis://localhost:6379");
 };
 
 export const parseRedisUrlTarget = (
@@ -33,16 +34,33 @@ export const parseRedisUrlTarget = (
   readonly protocol: string;
   readonly host: string;
 } => {
-  const url = new URL(redisUrl);
+  let url: URL;
+
+  try {
+    url = new URL(redisUrl);
+  } catch {
+    throw new ConfigValidationError(
+      [{ key: "REDIS_URL", message: "REDIS_URL must be a valid URL." }],
+      { REDIS_URL: redisUrl }
+    );
+  }
 
   if (url.protocol !== "redis:") {
-    throw new Error("REDIS_URL must use the redis protocol for local Phase 4 queue behavior.");
+    throw new ConfigValidationError(
+      [{ key: "REDIS_URL", message: "REDIS_URL must use the redis protocol." }],
+      { REDIS_URL: redisUrl }
+    );
   }
 
   return {
     protocol: url.protocol,
     host: normalizeHostname(url.hostname).toLowerCase()
   };
+};
+
+export const validateRedisUrl = (redisUrl: string): string => {
+  parseRedisUrlTarget(redisUrl);
+  return redisUrl;
 };
 
 export const assertLocalRedisUrl = (redisUrl: string): void => {
@@ -77,5 +95,16 @@ export const closeRedisConnection = async (connection: Redis): Promise<void> => 
     await connection.quit();
   } catch {
     connection.disconnect();
+  }
+};
+
+export const checkRedisConnection = async (connection: Redis): Promise<void> => {
+  try {
+    await connection.ping();
+  } catch (cause) {
+    throw new OperationalError({
+      code: "queue_connection_failed",
+      cause
+    });
   }
 };

@@ -17,6 +17,7 @@ export interface ApiErrorResponse {
     readonly issues?: readonly string[];
   };
   readonly eventId?: string;
+  readonly correlationId?: string;
 }
 
 export const createWebhookSuccessResponse = (
@@ -27,6 +28,7 @@ export const createErrorResponse = (input: {
   readonly code: ApiErrorCode;
   readonly message: string;
   readonly eventId?: string;
+  readonly correlationId?: string;
   readonly issues?: readonly string[];
 }): ApiErrorResponse => ({
   ok: false,
@@ -35,5 +37,6 @@ export const createErrorResponse = (input: {
     message: input.message,
     issues: input.issues
   },
-  eventId: input.eventId
+  eventId: input.eventId,
+  correlationId: input.correlationId
 });

@@ -2,17 +2,31 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createRetryPolicyFromEnv, resolveRedisUrl } from "@webhook-monitor/queue";
-import type { RetryPolicy } from "@webhook-monitor/core";
+import {
+  ConfigValidationError,
+  parseIntegerEnv,
+  parseLogLevel,
+  parseNodeEnvironment,
+  parseUrlEnv,
+  type ConfigIssue,
+  type LogLevel,
+  type NodeEnvironment,
+  type RetryPolicy
+} from "@webhook-monitor/core";
+import { createRetryPolicyFromEnv } from "@webhook-monitor/queue";
 
 export type MockDownstreamMode = "payload-driven";
 
 export interface WorkerConfig {
+  readonly nodeEnv: NodeEnvironment;
+  readonly serviceName: string;
+  readonly databaseUrl: string;
   readonly redisUrl: string;
   readonly concurrency: number;
   readonly retryPolicy: RetryPolicy;
   readonly mockDownstreamMode: MockDownstreamMode;
   readonly mockDownstreamUrl: string;
+  readonly logLevel: LogLevel;
 }
 
 export interface LoadLocalWorkerEnvOptions {
@@ -63,20 +77,6 @@ const loadEnvFileIfExists = (path: string, targetEnv: NodeJS.ProcessEnv = proces
   }
 };
 
-const parsePositiveInteger = (value: string | undefined, key: string, fallback: number): number => {
-  if (!value?.trim()) {
-    return fallback;
-  }
-
-  const parsed = Number(value);
-
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    throw new Error(`${key} must be a positive integer.`);
-  }
-
-  return parsed;
-};
-
 const parseMockDownstreamMode = (value: string | undefined): MockDownstreamMode => {
   const mode = value?.trim() || "payload-driven";
 
@@ -95,11 +95,86 @@ export const loadLocalWorkerEnv = (options: LoadLocalWorkerEnvOptions = {}): voi
   }
 };
 
-export const loadWorkerConfig = (env: NodeJS.ProcessEnv = process.env): WorkerConfig => ({
-  redisUrl: resolveRedisUrl({ env }),
-  concurrency: parsePositiveInteger(env.WORKER_CONCURRENCY, "WORKER_CONCURRENCY", 2),
-  retryPolicy: createRetryPolicyFromEnv(env),
-  mockDownstreamMode: parseMockDownstreamMode(env.MOCK_DOWNSTREAM_MODE),
-  mockDownstreamUrl:
-    env.MOCK_DOWNSTREAM_URL?.trim() || "http://localhost:3000/mock-downstream/deliver"
-});
+const configKeys = [
+  "NODE_ENV",
+  "DATABASE_URL",
+  "REDIS_URL",
+  "WORKER_CONCURRENCY",
+  "DELIVERY_MAX_ATTEMPTS",
+  "DELIVERY_INITIAL_DELAY_MS",
+  "DELIVERY_BACKOFF_MULTIPLIER",
+  "DELIVERY_MAX_DELAY_MS",
+  "MOCK_DOWNSTREAM_MODE",
+  "MOCK_DOWNSTREAM_URL",
+  "LOG_LEVEL"
+] as const;
+
+const diagnosticsFor = (env: NodeJS.ProcessEnv): Record<string, unknown> =>
+  Object.fromEntries(configKeys.map((key) => [key, env[key]]));
+
+const captureIssue = <TValue>(
+  issues: ConfigIssue[],
+  key: string,
+  readValue: () => TValue
+): TValue | undefined => {
+  try {
+    return readValue();
+  } catch (error) {
+    issues.push({
+      key,
+      message: error instanceof Error ? error.message : "Invalid configuration value."
+    });
+    return undefined;
+  }
+};
+
+export const loadWorkerConfig = (env: NodeJS.ProcessEnv = process.env): WorkerConfig => {
+  const issues: ConfigIssue[] = [];
+  const nodeEnv = captureIssue(issues, "NODE_ENV", () => parseNodeEnvironment(env.NODE_ENV));
+  const databaseUrl = captureIssue(issues, "DATABASE_URL", () =>
+    parseUrlEnv(env, "DATABASE_URL", {
+      required: true,
+      protocols: ["postgres:", "postgresql:"]
+    })
+  );
+  const redisUrl = captureIssue(issues, "REDIS_URL", () =>
+    parseUrlEnv(env, "REDIS_URL", {
+      required: true,
+      protocols: ["redis:"]
+    })
+  );
+  const concurrency = captureIssue(issues, "WORKER_CONCURRENCY", () =>
+    parseIntegerEnv(env, "WORKER_CONCURRENCY", 2, {
+      minimum: 1
+    })
+  );
+  const retryPolicy = captureIssue(issues, "DELIVERY_RETRY_POLICY", () =>
+    createRetryPolicyFromEnv(env)
+  );
+  const mockDownstreamMode = captureIssue(issues, "MOCK_DOWNSTREAM_MODE", () =>
+    parseMockDownstreamMode(env.MOCK_DOWNSTREAM_MODE)
+  );
+  const mockDownstreamUrl = captureIssue(issues, "MOCK_DOWNSTREAM_URL", () =>
+    parseUrlEnv(env, "MOCK_DOWNSTREAM_URL", {
+      fallback: "http://localhost:3000/mock-downstream/deliver",
+      protocols: ["http:", "https:"]
+    })
+  );
+  const logLevel = captureIssue(issues, "LOG_LEVEL", () => parseLogLevel(env.LOG_LEVEL, "info"));
+
+  if (issues.length > 0) {
+    throw new ConfigValidationError(issues, diagnosticsFor(env));
+  }
+
+  return {
+    nodeEnv: nodeEnv ?? "development",
+    serviceName: "webhook-reliability-worker",
+    databaseUrl: databaseUrl ?? "",
+    redisUrl: redisUrl ?? "",
+    concurrency: concurrency ?? 2,
+    retryPolicy: retryPolicy ?? createRetryPolicyFromEnv({}),
+    mockDownstreamMode: mockDownstreamMode ?? "payload-driven",
+    mockDownstreamUrl: mockDownstreamUrl ?? "http://localhost:3000/mock-downstream/deliver",
+    logLevel: logLevel ?? "info"
+  };
+};

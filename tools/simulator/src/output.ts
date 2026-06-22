@@ -47,6 +47,9 @@ export const printScenarioStart = (input: ScenarioOutputInput): void => {
 
 export const printHttpResult = (response: SimulatorHttpResponse): void => {
   console.log(`HTTP status: ${response.status}`);
+  if (response.headers["x-request-id"]) {
+    console.log(`Correlation ID: ${response.headers["x-request-id"]}`);
+  }
   console.log(`Response: ${bodySummary(response)}`);
 };
 

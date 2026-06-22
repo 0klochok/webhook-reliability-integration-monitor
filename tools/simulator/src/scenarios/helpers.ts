@@ -204,6 +204,21 @@ export const assertCleanDashboard = async (context: ScenarioContext): Promise<vo
   }
 };
 
+export const assertApiReady = async (context: ScenarioContext): Promise<void> => {
+  const response = await context.http.request({
+    method: "GET",
+    path: "/readyz"
+  });
+
+  printHttpResult(response);
+
+  if (response.status !== 200) {
+    throw new Error(
+      `Expected readiness HTTP 200 but received ${response.status}. Start Postgres and Redis, then retry.`
+    );
+  }
+};
+
 export const getEventDetail = async (
   context: ScenarioContext,
   eventId: string

@@ -5,6 +5,7 @@ import {
   createWebhookEventRepository,
   type DatabaseClient
 } from "@webhook-monitor/db";
+import type { Logger } from "@webhook-monitor/core";
 import {
   createBullMqDeliveryWorker,
   type BullMqDeliveryWorkerResource,
@@ -24,6 +25,7 @@ export interface DeliveryWorkerRuntime {
 export interface CreateDeliveryWorkerRuntimeInput {
   readonly database: DatabaseClient;
   readonly config: WorkerConfig;
+  readonly logger: Logger;
 }
 
 const toProcessorJob = (job: DeliveryJob) => ({
@@ -42,7 +44,8 @@ export const createDeliveryWorkerRuntime = (
     manualReplays: createManualReplaysRepository(input.database.db),
     downstreamClient: createPayloadDrivenMockDownstreamClient(),
     retryPolicy: input.config.retryPolicy,
-    targetUrl: input.config.mockDownstreamUrl
+    targetUrl: input.config.mockDownstreamUrl,
+    logger: input.logger
   };
   const workerResource = createBullMqDeliveryWorker({
     redisUrl: input.config.redisUrl,
@@ -52,15 +55,28 @@ export const createDeliveryWorkerRuntime = (
   });
 
   workerResource.worker.on("completed", (job) => {
-    console.log(`Delivery job ${job.id ?? "<unknown>"} completed.`);
+    input.logger.info("BullMQ delivery job completed.", {
+      correlationId: job.data.correlationId,
+      jobId: job.id,
+      eventId: job.data.eventId,
+      providerId: job.data.providerId,
+      externalEventId: job.data.externalEventId
+    });
   });
 
   workerResource.worker.on("failed", (job, error) => {
-    console.error(
-      `Delivery job ${job?.id ?? "<unknown>"} failed: ${
-        error instanceof Error ? error.message : "unknown error"
-      }`
-    );
+    input.logger.warn("BullMQ delivery job failed.", {
+      correlationId: job?.data.correlationId,
+      jobId: job?.id,
+      eventId: job?.data.eventId,
+      providerId: job?.data.providerId,
+      externalEventId: job?.data.externalEventId,
+      errorCode:
+        error instanceof Error && "reasonCode" in error && typeof error.reasonCode === "string"
+          ? error.reasonCode
+          : "downstream_retryable_failure",
+      error
+    });
   });
 
   return {

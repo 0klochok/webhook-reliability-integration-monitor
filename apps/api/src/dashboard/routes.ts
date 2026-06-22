@@ -1,15 +1,14 @@
-import { eventStatusSchema } from "@webhook-monitor/core";
+import { eventStatusSchema, type Logger } from "@webhook-monitor/core";
 import {
   ManualReplayNotAllowedError,
   WebhookEventNotFoundError,
   type createDashboardRepository
 } from "@webhook-monitor/db";
 import type { DeliveryQueuePort } from "@webhook-monitor/queue";
-import type { Hono } from "hono";
-import type { Context } from "hono";
 
 import { ApiError, toApiError } from "../errors.js";
 import { createErrorResponse } from "../services/response-shapes.js";
+import type { ApiApp, ApiContext } from "../types.js";
 import { renderDeadLetterView } from "./dead-letter-view.js";
 import { renderEventDetailView } from "./event-detail-view.js";
 import { renderEventListView } from "./event-list-view.js";
@@ -21,6 +20,7 @@ export type DashboardRepository = ReturnType<typeof createDashboardRepository>;
 export interface DashboardRouteDependencies {
   readonly dashboard: DashboardRepository;
   readonly deliveryQueue: DeliveryQueuePort;
+  readonly logger: Logger;
   readonly clock?: () => Date;
 }
 
@@ -84,21 +84,23 @@ const routeErrorToApiError = (error: unknown): ApiError => {
   return toApiError(error);
 };
 
-const jsonError = (context: Context, error: unknown): Response => {
+const jsonError = (context: ApiContext, error: unknown): Response => {
   const apiError = routeErrorToApiError(error);
+  const correlationId = context.get("correlationId");
 
   return context.json(
     createErrorResponse({
       code: apiError.code,
       message: apiError.publicMessage,
       eventId: apiError.eventId,
+      correlationId,
       issues: apiError.issues
     }),
     apiError.statusCode
   );
 };
 
-const htmlError = (context: Context, error: unknown): Response => {
+const htmlError = (context: ApiContext, error: unknown): Response => {
   const apiError = routeErrorToApiError(error);
 
   return context.html(
@@ -115,7 +117,11 @@ const replayStatusMessage = (value: string | undefined): string | undefined => {
   return undefined;
 };
 
-const createManualReplay = async (dependencies: DashboardRouteDependencies, eventId: string) => {
+const createManualReplay = async (
+  dependencies: DashboardRouteDependencies,
+  eventId: string,
+  correlationId: string
+) => {
   const requestedAt = dependencies.clock?.() ?? new Date();
   const replayRequest = await dependencies.dashboard.createManualReplayRequest({
     eventId,
@@ -123,7 +129,8 @@ const createManualReplay = async (dependencies: DashboardRouteDependencies, even
     reason: "Manual replay requested from the local dashboard.",
     requestedAt,
     metadata: {
-      source: "local_dashboard"
+      source: "local_dashboard",
+      correlationId
     }
   });
 
@@ -134,6 +141,7 @@ const createManualReplay = async (dependencies: DashboardRouteDependencies, even
       eventId: replayRequest.event.id,
       providerId: replayRequest.event.providerId,
       externalEventId: replayRequest.event.externalEventId,
+      correlationId,
       enqueuedAt: requestedAt.toISOString(),
       replayOfEventId: replayRequest.event.id,
       manualReplayId: replayRequest.manualReplay.id,
@@ -145,14 +153,14 @@ const createManualReplay = async (dependencies: DashboardRouteDependencies, even
     const failedAt = dependencies.clock?.() ?? new Date();
     await dependencies.dashboard.markManualReplayFailed({
       replayId: replayRequest.manualReplay.id,
-      errorCode: "queue_enqueue_failed",
+      errorCode: "replay_enqueue_failed",
       errorMessage: "Replay delivery job could not be queued.",
       completedAt: failedAt
     });
 
     throw new ApiError({
-      code: "queue_enqueue_failed",
-      statusCode: 500,
+      code: "replay_enqueue_failed",
+      statusCode: 503,
       publicMessage: "Manual replay could not be queued for delivery.",
       eventId,
       cause
@@ -180,7 +188,7 @@ const createManualReplay = async (dependencies: DashboardRouteDependencies, even
 };
 
 export const registerDashboardRoutes = (
-  app: Hono,
+  app: ApiApp,
   dependencies: DashboardRouteDependencies
 ): void => {
   app.get("/dashboard", async (context) => {
@@ -237,7 +245,7 @@ export const registerDashboardRoutes = (
     try {
       const eventId = context.req.param("eventId");
       validateEventId(eventId);
-      await createManualReplay(dependencies, eventId);
+      await createManualReplay(dependencies, eventId, context.get("correlationId"));
 
       return context.redirect(`/dashboard/events/${eventId}?replay=queued`, 303);
     } catch (error) {
@@ -297,7 +305,7 @@ export const registerDashboardRoutes = (
     try {
       const eventId = context.req.param("eventId");
       validateEventId(eventId);
-      const replay = await createManualReplay(dependencies, eventId);
+      const replay = await createManualReplay(dependencies, eventId, context.get("correlationId"));
 
       return context.json(createSuccessResponse(replay));
     } catch (error) {

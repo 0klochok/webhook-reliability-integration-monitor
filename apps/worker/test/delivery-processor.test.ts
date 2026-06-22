@@ -1,3 +1,4 @@
+import { createMemoryLogger } from "@webhook-monitor/core";
 import {
   createRetryPolicyFromEnv,
   createDeliveryJobData,
@@ -143,6 +144,10 @@ const createDependencies = (
   downstreamClient: createPayloadDrivenMockDownstreamClient(),
   retryPolicy: createRetryPolicy(maxAttempts),
   targetUrl: "http://localhost:3000/mock-downstream/deliver",
+  logger: createMemoryLogger({
+    service: "webhook-reliability-worker",
+    level: "silent"
+  }),
   clock
 });
 
@@ -216,6 +221,51 @@ describe("delivery processor", () => {
     expect(history.map((entry) => entry.toStatus)).toContain("queued");
     expect(history.map((entry) => entry.toStatus).slice(-1)).toEqual(["delivered"]);
     expect(history.map((entry) => entry.toStatus)).toContain("processing");
+  });
+
+  it("uses job correlation IDs in worker logs and status history", async () => {
+    const event = await createPersistedQueuedEvent("success", "worker-correlation-1");
+    const logger = createMemoryLogger({
+      service: "webhook-reliability-worker",
+      level: "debug",
+      clock: () => new Date("2026-06-20T12:00:00.000Z")
+    });
+    const dependencies = {
+      ...createDependencies(),
+      logger
+    };
+
+    await processDeliveryJob(dependencies, {
+      id: createDeliveryJobId(event.id),
+      data: createDeliveryJobData({
+        eventId: event.id,
+        providerId: event.providerId,
+        externalEventId: event.externalEventId,
+        correlationId: "worker-correlation-123",
+        enqueuedAt: "2026-06-20T12:00:00.000Z"
+      }),
+      attemptsMade: 0
+    });
+
+    const history = await dependencies.webhookEvents.listStatusHistory(event.id);
+
+    expect(logger.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: "Delivery job processing started.",
+          correlationId: "worker-correlation-123",
+          jobId: createDeliveryJobId(event.id),
+          eventId: event.id
+        }),
+        expect.objectContaining({
+          message: "Delivery job completed.",
+          correlationId: "worker-correlation-123"
+        })
+      ])
+    );
+    expect(
+      history.some((entry) => JSON.stringify(entry.metadata).includes("worker-correlation-123"))
+    ).toBe(true);
   });
 
   it("records retryable failure and later success", async () => {

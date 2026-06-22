@@ -1,9 +1,5 @@
+import type { Logger } from "@webhook-monitor/core";
 import { closeRedisConnection } from "@webhook-monitor/queue";
-
-export interface ShutdownLogger {
-  log(message: string): void;
-  error(message: string): void;
-}
 
 export interface ClosableWorker {
   close(): Promise<void>;
@@ -16,7 +12,8 @@ export interface WorkerShutdownResources {
   readonly redisConnection?: ClosableRedisConnection;
   readonly ownsRedisConnection?: boolean;
   readonly closeDatabase?: () => Promise<void>;
-  readonly logger?: ShutdownLogger;
+  readonly logger?: Logger;
+  readonly timeoutMs?: number;
 }
 
 export const closeWorkerResources = async (resources: WorkerShutdownResources): Promise<void> => {
@@ -29,25 +26,80 @@ export const closeWorkerResources = async (resources: WorkerShutdownResources): 
   await resources.closeDatabase?.();
 };
 
+const withTimeout = async <TValue>(
+  promise: Promise<TValue>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<TValue> => {
+  let timeout: NodeJS.Timeout | undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+};
+
+export interface WorkerShutdownController {
+  shutdown(signal?: NodeJS.Signals | "startup_failure"): Promise<void>;
+}
+
+export const createWorkerShutdownController = (
+  resources: WorkerShutdownResources
+): WorkerShutdownController => {
+  let shutdownPromise: Promise<void> | undefined;
+
+  return {
+    shutdown: (signal = "startup_failure") => {
+      if (shutdownPromise) {
+        return shutdownPromise;
+      }
+
+      resources.logger?.info("Worker shutdown started.", {
+        signal
+      });
+
+      shutdownPromise = withTimeout(
+        closeWorkerResources(resources),
+        resources.timeoutMs ?? 5_000,
+        "Worker shutdown timed out."
+      )
+        .then(() => {
+          resources.logger?.info("Worker shutdown completed.", {
+            signal
+          });
+        })
+        .catch((error: unknown) => {
+          resources.logger?.error("Worker shutdown failed.", {
+            signal,
+            errorCode: "worker_shutdown_failed",
+            error: error instanceof Error ? error : undefined
+          });
+          throw error;
+        });
+
+      return shutdownPromise;
+    }
+  };
+};
+
 export const registerWorkerShutdown = (resources: WorkerShutdownResources): (() => void) => {
-  const logger = resources.logger ?? console;
-  let isShuttingDown = false;
+  const controller = createWorkerShutdownController(resources);
 
   const shutdown = (signal: NodeJS.Signals): void => {
-    if (isShuttingDown) {
-      return;
-    }
-
-    isShuttingDown = true;
-    logger.log(`Received ${signal}; shutting down webhook delivery worker.`);
-
-    closeWorkerResources(resources)
+    controller
+      .shutdown(signal)
       .then(() => {
-        logger.log("Webhook delivery worker shut down cleanly.");
         process.exit(0);
       })
-      .catch((error: unknown) => {
-        logger.error(error instanceof Error ? error.message : "Worker shutdown failed.");
+      .catch(() => {
         process.exit(1);
       });
   };

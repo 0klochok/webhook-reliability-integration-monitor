@@ -1,3 +1,4 @@
+import { createMemoryLogger } from "@webhook-monitor/core";
 import {
   closeRedisConnection,
   createBullMqDeliveryQueue,
@@ -112,7 +113,11 @@ const createQueueWorkerPair = async () => {
     manualReplays: createManualReplaysRepository(client.db),
     downstreamClient: createPayloadDrivenMockDownstreamClient(),
     retryPolicy,
-    targetUrl: "http://localhost:3000/mock-downstream/deliver"
+    targetUrl: "http://localhost:3000/mock-downstream/deliver",
+    logger: createMemoryLogger({
+      service: "webhook-reliability-worker",
+      level: "silent"
+    })
   };
   const workerResource = createBullMqDeliveryWorker({
     queueName,

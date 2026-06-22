@@ -2,12 +2,31 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  ConfigValidationError,
+  getOptionalEnv,
+  parseIntegerEnv,
+  parseLogLevel,
+  parseNodeEnvironment,
+  parseUrlEnv,
+  type ConfigIssue,
+  type LogLevel,
+  type NodeEnvironment
+} from "@webhook-monitor/core";
+
 export interface ApiConfig {
+  readonly nodeEnv: NodeEnvironment;
   readonly host: string;
   readonly port: number;
   readonly serviceName: string;
+  readonly databaseUrl: string;
+  readonly redisUrl: string;
   readonly stripeSampleWebhookSecret?: string;
   readonly signatureTimestampToleranceSeconds: number;
+  readonly webhookMaxBodyBytes: number;
+  readonly webhookRateLimitWindowMs: number;
+  readonly webhookRateLimitMaxRequests: number;
+  readonly logLevel: LogLevel;
 }
 
 export interface LoadLocalApiEnvOptions {
@@ -58,25 +77,6 @@ const loadEnvFileIfExists = (path: string, targetEnv: NodeJS.ProcessEnv = proces
   }
 };
 
-const parsePort = (value: string | undefined): number => {
-  if (!value) {
-    return 3000;
-  }
-
-  const port = Number(value);
-
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error("API_PORT must be an integer between 1 and 65535.");
-  }
-
-  return port;
-};
-
-const getOptionalEnv = (env: NodeJS.ProcessEnv, key: string): string | undefined => {
-  const value = env[key]?.trim();
-  return value ? value : undefined;
-};
-
 export const loadLocalApiEnv = (options: LoadLocalApiEnvOptions = {}): void => {
   loadEnvFileIfExists(join(repoRoot, ".env"));
 
@@ -85,10 +85,98 @@ export const loadLocalApiEnv = (options: LoadLocalApiEnvOptions = {}): void => {
   }
 };
 
-export const loadApiConfig = (env: NodeJS.ProcessEnv = process.env): ApiConfig => ({
-  host: getOptionalEnv(env, "API_HOST") ?? "localhost",
-  port: parsePort(env.API_PORT),
-  serviceName: "webhook-reliability-api",
-  stripeSampleWebhookSecret: getOptionalEnv(env, "STRIPE_SAMPLE_WEBHOOK_SECRET"),
-  signatureTimestampToleranceSeconds: 300
-});
+const configKeys = [
+  "NODE_ENV",
+  "API_HOST",
+  "API_PORT",
+  "DATABASE_URL",
+  "REDIS_URL",
+  "STRIPE_SAMPLE_WEBHOOK_SECRET",
+  "WEBHOOK_MAX_BODY_BYTES",
+  "WEBHOOK_RATE_LIMIT_WINDOW_MS",
+  "WEBHOOK_RATE_LIMIT_MAX_REQUESTS",
+  "LOG_LEVEL"
+] as const;
+
+const diagnosticsFor = (env: NodeJS.ProcessEnv): Record<string, unknown> =>
+  Object.fromEntries(configKeys.map((key) => [key, env[key]]));
+
+const captureIssue = <TValue>(
+  issues: ConfigIssue[],
+  key: string,
+  readValue: () => TValue
+): TValue | undefined => {
+  try {
+    return readValue();
+  } catch (error) {
+    issues.push({
+      key,
+      message: error instanceof Error ? error.message : "Invalid configuration value."
+    });
+    return undefined;
+  }
+};
+
+export const loadApiConfig = (env: NodeJS.ProcessEnv = process.env): ApiConfig => {
+  const issues: ConfigIssue[] = [];
+  const nodeEnv = captureIssue(issues, "NODE_ENV", () => parseNodeEnvironment(env.NODE_ENV));
+  const port = captureIssue(issues, "API_PORT", () =>
+    parseIntegerEnv(env, "API_PORT", 3000, { minimum: 1, maximum: 65_535 })
+  );
+  const databaseUrl = captureIssue(issues, "DATABASE_URL", () =>
+    parseUrlEnv(env, "DATABASE_URL", {
+      required: true,
+      protocols: ["postgres:", "postgresql:"]
+    })
+  );
+  const redisUrl = captureIssue(issues, "REDIS_URL", () =>
+    parseUrlEnv(env, "REDIS_URL", {
+      required: true,
+      protocols: ["redis:"]
+    })
+  );
+  const webhookMaxBodyBytes = captureIssue(issues, "WEBHOOK_MAX_BODY_BYTES", () =>
+    parseIntegerEnv(env, "WEBHOOK_MAX_BODY_BYTES", 1_048_576, {
+      minimum: 1,
+      maximum: 10_485_760
+    })
+  );
+  const webhookRateLimitWindowMs = captureIssue(issues, "WEBHOOK_RATE_LIMIT_WINDOW_MS", () =>
+    parseIntegerEnv(env, "WEBHOOK_RATE_LIMIT_WINDOW_MS", 60_000, {
+      minimum: 1
+    })
+  );
+  const webhookRateLimitMaxRequests = captureIssue(issues, "WEBHOOK_RATE_LIMIT_MAX_REQUESTS", () =>
+    parseIntegerEnv(env, "WEBHOOK_RATE_LIMIT_MAX_REQUESTS", 120, {
+      minimum: 1
+    })
+  );
+  const logLevel = captureIssue(issues, "LOG_LEVEL", () => parseLogLevel(env.LOG_LEVEL, "info"));
+  const stripeSampleWebhookSecret = getOptionalEnv(env, "STRIPE_SAMPLE_WEBHOOK_SECRET");
+
+  if (nodeEnv === "production" && !stripeSampleWebhookSecret) {
+    issues.push({
+      key: "STRIPE_SAMPLE_WEBHOOK_SECRET",
+      message: "STRIPE_SAMPLE_WEBHOOK_SECRET is required in production."
+    });
+  }
+
+  if (issues.length > 0) {
+    throw new ConfigValidationError(issues, diagnosticsFor(env));
+  }
+
+  return {
+    nodeEnv: nodeEnv ?? "development",
+    host: getOptionalEnv(env, "API_HOST") ?? "localhost",
+    port: port ?? 3000,
+    serviceName: "webhook-reliability-api",
+    databaseUrl: databaseUrl ?? "",
+    redisUrl: redisUrl ?? "",
+    stripeSampleWebhookSecret,
+    signatureTimestampToleranceSeconds: 300,
+    webhookMaxBodyBytes: webhookMaxBodyBytes ?? 1_048_576,
+    webhookRateLimitWindowMs: webhookRateLimitWindowMs ?? 60_000,
+    webhookRateLimitMaxRequests: webhookRateLimitMaxRequests ?? 120,
+    logLevel: logLevel ?? "info"
+  };
+};

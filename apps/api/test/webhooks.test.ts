@@ -118,10 +118,62 @@ describe("webhook ingress API", () => {
     const body = (await response.json()) as { readonly ok: boolean; readonly service: string };
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-request-id")).toEqual(expect.any(String));
     expect(body).toEqual({
       ok: true,
       service: "webhook-reliability-api"
     });
+  });
+
+  it("returns readiness success when database and queue checks pass", async () => {
+    const { app } = createApiTestHarness({ client });
+
+    const response = await app.request("/readyz");
+    const body = (await response.json()) as {
+      readonly ok: true;
+      readonly service: string;
+      readonly dependencies: { readonly database: string; readonly queue: string };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      ok: true,
+      service: "webhook-reliability-api",
+      dependencies: {
+        database: "ok",
+        queue: "ok"
+      }
+    });
+  });
+
+  it("returns readiness failure without exposing dependency URLs", async () => {
+    const { app } = createApiTestHarness({
+      client,
+      queueReadiness: async () => {
+        throw new Error("redis://:redis-password@localhost:6379 is down");
+      }
+    });
+
+    const response = await app.request("/readyz");
+    const bodyText = await response.text();
+    const body = JSON.parse(bodyText) as {
+      readonly ok: false;
+      readonly dependencies: { readonly database: string; readonly queue: string };
+      readonly error: { readonly code: string };
+    };
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({
+      ok: false,
+      dependencies: {
+        database: "ok",
+        queue: "unavailable"
+      },
+      error: {
+        code: "queue_unavailable"
+      }
+    });
+    expect(bodyText).not.toContain("redis-password");
   });
 
   it("accepts a valid generic HTTP webhook, persists it, and enqueues delivery once", async () => {
@@ -135,6 +187,7 @@ describe("webhook ingress API", () => {
     const body = (await response.json()) as WebhookSuccessResponse;
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-request-id")).toEqual(expect.any(String));
     expect(body).toMatchObject({
       ok: true,
       providerId: "generic-http",
@@ -147,6 +200,7 @@ describe("webhook ingress API", () => {
       eventId: body.eventId,
       providerId: "generic-http",
       externalEventId: payload.eventId,
+      correlationId: response.headers.get("x-request-id"),
       enqueuedAt: new Date(fixedNow.getTime() + 2).toISOString()
     });
 
@@ -180,6 +234,29 @@ describe("webhook ingress API", () => {
     await expect(webhookEvents.getById(body.eventId)).resolves.toMatchObject({
       currentStatus: "queued",
       providerId: "mock-crm"
+    });
+  });
+
+  it("preserves a valid incoming x-request-id and passes it to queue data", async () => {
+    const { app, deliveryQueue } = createApiTestHarness({
+      client,
+      clock: () => fixedNow
+    });
+    const payload = createGenericPayload("generic-correlation-event-1");
+
+    const response = await app.request("/webhooks/generic-http", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "demo-correlation-123"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-request-id")).toBe("demo-correlation-123");
+    expect(deliveryQueue.calls[0]).toMatchObject({
+      correlationId: "demo-correlation-123"
     });
   });
 
@@ -230,7 +307,9 @@ describe("webhook ingress API", () => {
     const body = (await response.json()) as ApiErrorResponse;
 
     expect(response.status).toBe(401);
+    expect(response.headers.get("x-request-id")).toEqual(expect.any(String));
     expect(body.error.code).toBe("invalid_signature");
+    expect(body.correlationId).toBe(response.headers.get("x-request-id"));
     expect(body.eventId).toEqual(expect.any(String));
     expect(deliveryQueue.calls).toHaveLength(0);
 
@@ -261,6 +340,7 @@ describe("webhook ingress API", () => {
 
     expect(response.status).toBe(400);
     expect(body.error.code).toBe("invalid_payload");
+    expect(body.correlationId).toBe(response.headers.get("x-request-id"));
     expect(body.error.issues?.length).toBeGreaterThan(0);
     expect(deliveryQueue.calls).toHaveLength(0);
 
@@ -291,6 +371,7 @@ describe("webhook ingress API", () => {
 
     expect(response.status).toBe(400);
     expect(body.error.code).toBe("invalid_json");
+    expect(body.correlationId).toBe(response.headers.get("x-request-id"));
     expect(body.eventId).toEqual(expect.any(String));
     expect(deliveryQueue.calls).toHaveLength(0);
 
@@ -349,15 +430,154 @@ describe("webhook ingress API", () => {
     const body = (await response.json()) as ApiErrorResponse;
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({
+    expect(body).toMatchObject({
       ok: false,
       error: {
         code: "unsupported_provider",
         message: "Unsupported webhook provider."
-      }
+      },
+      correlationId: response.headers.get("x-request-id")
     });
     expect(await countEvents()).toBe(0);
     expect(deliveryQueue.calls).toHaveLength(0);
+  });
+
+  it("rejects oversized webhook payloads without persistence or queue calls", async () => {
+    const { app, deliveryQueue } = createApiTestHarness({
+      client,
+      config: {
+        webhookMaxBodyBytes: 20
+      }
+    });
+
+    const response = await app.request("/webhooks/generic-http", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(createGenericPayload("generic-oversized-event-1"))
+    });
+    const body = (await response.json()) as ApiErrorResponse;
+
+    expect(response.status).toBe(413);
+    expect(body).toMatchObject({
+      ok: false,
+      error: {
+        code: "payload_too_large"
+      },
+      correlationId: response.headers.get("x-request-id")
+    });
+    expect(await countEvents()).toBe(0);
+    expect(deliveryQueue.calls).toHaveLength(0);
+  });
+
+  it("rate limits webhook ingress by provider and client key", async () => {
+    const { app, deliveryQueue } = createApiTestHarness({
+      client,
+      clock: () => fixedNow,
+      config: {
+        webhookRateLimitWindowMs: 60_000,
+        webhookRateLimitMaxRequests: 1
+      }
+    });
+
+    const firstResponse = await app.request("/webhooks/generic-http", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: JSON.stringify(createGenericPayload("generic-rate-limit-event-1"))
+    });
+    const secondResponse = await app.request("/webhooks/generic-http", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "127.0.0.1"
+      },
+      body: JSON.stringify(createGenericPayload("generic-rate-limit-event-2"))
+    });
+    const secondBody = (await secondResponse.json()) as ApiErrorResponse;
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(429);
+    expect(secondResponse.headers.get("retry-after")).toEqual(expect.any(String));
+    expect(secondBody).toMatchObject({
+      ok: false,
+      error: {
+        code: "rate_limited"
+      },
+      correlationId: secondResponse.headers.get("x-request-id")
+    });
+    expect(deliveryQueue.calls).toHaveLength(1);
+  });
+
+  it("allows rate-limit windows to reset deterministically", async () => {
+    let now = fixedNow;
+    const { app } = createApiTestHarness({
+      client,
+      clock: () => now,
+      config: {
+        webhookRateLimitWindowMs: 1000,
+        webhookRateLimitMaxRequests: 1
+      }
+    });
+
+    const firstResponse = await app.request("/webhooks/generic-http", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "127.0.0.2"
+      },
+      body: JSON.stringify(createGenericPayload("generic-rate-reset-event-1"))
+    });
+    const limitedResponse = await app.request("/webhooks/generic-http", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "127.0.0.2"
+      },
+      body: JSON.stringify(createGenericPayload("generic-rate-reset-event-2"))
+    });
+    now = new Date(fixedNow.getTime() + 1001);
+    const resetResponse = await app.request("/webhooks/generic-http", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "127.0.0.2"
+      },
+      body: JSON.stringify(createGenericPayload("generic-rate-reset-event-3"))
+    });
+
+    expect(firstResponse.status).toBe(200);
+    expect(limitedResponse.status).toBe(429);
+    expect(resetResponse.status).toBe(200);
+  });
+
+  it("records enqueue failures without falsely reporting queued", async () => {
+    const { app, deliveryQueue, webhookEvents } = createApiTestHarness({
+      client,
+      clock: () => fixedNow
+    });
+    deliveryQueue.failNext(new Error("Fake queue failure."));
+
+    const response = await postJson(
+      app,
+      "/webhooks/generic-http",
+      createGenericPayload("generic-queue-failure-event-1")
+    );
+    const body = (await response.json()) as ApiErrorResponse;
+
+    expect(response.status).toBe(503);
+    expect(body.error.code).toBe("queue_enqueue_failed");
+    expect(deliveryQueue.calls).toHaveLength(0);
+    expect(body.eventId).toEqual(expect.any(String));
+
+    const event = await webhookEvents.getById(body.eventId ?? "");
+    const history = await webhookEvents.listStatusHistory(body.eventId ?? "");
+
+    expect(event?.currentStatus).toBe("failed_retryable");
+    expect(history.map((entry) => entry.reasonCode)).toContain("queue_enqueue_failed");
   });
 
   it("verifies stripe-sample signatures against the exact raw body", async () => {
@@ -386,6 +606,7 @@ describe("webhook ingress API", () => {
 
     expect(response.status).toBe(401);
     expect(body.error.code).toBe("invalid_signature");
+    expect(body.correlationId).toBe(response.headers.get("x-request-id"));
     expect(deliveryQueue.calls).toHaveLength(0);
 
     const event = await webhookEvents.getById(body.eventId ?? "");

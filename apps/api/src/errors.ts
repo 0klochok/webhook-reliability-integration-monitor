@@ -1,18 +1,12 @@
+import {
+  ConfigValidationError,
+  OperationalError,
+  getErrorDefinition,
+  type AppErrorCode
+} from "@webhook-monitor/core";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-export type ApiErrorCode =
-  | "unsupported_provider"
-  | "invalid_signature"
-  | "invalid_json"
-  | "invalid_payload"
-  | "persistence_error"
-  | "queue_enqueue_failed"
-  | "misconfigured_signature_secret"
-  | "invalid_event_id"
-  | "invalid_status_filter"
-  | "replay_not_allowed"
-  | "not_found"
-  | "internal_error";
+export type ApiErrorCode = AppErrorCode;
 
 export class ApiError extends Error {
   readonly code: ApiErrorCode;
@@ -23,17 +17,20 @@ export class ApiError extends Error {
 
   constructor(input: {
     readonly code: ApiErrorCode;
-    readonly statusCode: ContentfulStatusCode;
-    readonly publicMessage: string;
+    readonly statusCode?: ContentfulStatusCode;
+    readonly publicMessage?: string;
     readonly eventId?: string;
     readonly issues?: readonly string[];
     readonly cause?: unknown;
   }) {
-    super(input.publicMessage, { cause: input.cause });
+    const definition = getErrorDefinition(input.code);
+    const publicMessage = input.publicMessage ?? definition.publicMessage;
+
+    super(publicMessage, { cause: input.cause });
     this.name = "ApiError";
     this.code = input.code;
-    this.statusCode = input.statusCode;
-    this.publicMessage = input.publicMessage;
+    this.statusCode = input.statusCode ?? (definition.statusCode as ContentfulStatusCode);
+    this.publicMessage = publicMessage;
     this.eventId = input.eventId;
     this.issues = input.issues;
   }
@@ -44,9 +41,27 @@ export const toApiError = (error: unknown): ApiError => {
     return error;
   }
 
+  if (error instanceof OperationalError) {
+    return new ApiError({
+      code: error.code,
+      statusCode: error.statusCode as ContentfulStatusCode,
+      publicMessage: error.publicMessage,
+      cause: error
+    });
+  }
+
+  if (error instanceof ConfigValidationError) {
+    return new ApiError({
+      code: "config_invalid",
+      statusCode: 500,
+      publicMessage: "Runtime configuration is invalid.",
+      issues: error.issues.map((issue) => `${issue.key}: ${issue.message}`),
+      cause: error
+    });
+  }
+
   return new ApiError({
     code: "internal_error",
-    statusCode: 500,
-    publicMessage: "The API could not complete the request."
+    statusCode: 500
   });
 };

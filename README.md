@@ -104,8 +104,38 @@ docs            architecture notes, demo script, manual verification notes
 pnpm install
 ```
 
-Copy `.env.example` to `.env` only when a future phase requires local environment values. The
-example file uses fake local-only values.
+`.env.example` contains fake local-only values only. Use those exact values for local manual
+verification unless you intentionally changed the Docker Compose credentials and volumes.
+
+PowerShell environment variables are process-local. Set them in every terminal that starts a
+project command; setting them in one terminal does not update an already-running API/worker process
+or another terminal.
+
+Common local values:
+
+```powershell
+$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
+$env:REDIS_URL = "redis://localhost:6379"
+$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
+```
+
+For runtime verification, start Docker PostgreSQL and Redis first, set the env vars in the current
+terminal, and run migrations before starting the API, worker, or simulator:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
+docker compose -f .\infra\docker-compose.yml ps
+$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
+$env:REDIS_URL = "redis://localhost:6379"
+$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
+pnpm db:migrate
+```
+
+API terminals require `DATABASE_URL`, `REDIS_URL`, and `STRIPE_SAMPLE_WEBHOOK_SECRET` for simulator
+and Stripe-style webhook verification. Worker terminals require `DATABASE_URL` and `REDIS_URL`.
+Simulator terminals should use the same fake `STRIPE_SAMPLE_WEBHOOK_SECRET`, and the API must be
+running with that value already loaded. Restart `pnpm dev:api` after changing any API environment
+variable.
 
 ## Phase 2 Local Database
 
@@ -590,6 +620,89 @@ Troubleshooting:
   `pnpm dev:worker`.
 - If deterministic scenario IDs already exist, run `pnpm demo:reset`.
 - Do not replace fake local secrets with real provider secrets.
+
+## Phase 7 Reliability Hardening
+
+Phase 7 adds production-style guardrails while keeping the project local-first and fake-provider
+only. The API, worker, queue, database client, and simulator now validate runtime configuration,
+emit structured JSON logs, redact secret-like values, and carry request/job correlation IDs.
+
+Required local runtime values for manual validation:
+
+- `DATABASE_URL=postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor`
+- `REDIS_URL=redis://localhost:6379`
+- `STRIPE_SAMPLE_WEBHOOK_SECRET=whsec_local_test_secret`
+
+The API fails fast with a config validation error if `DATABASE_URL` or `REDIS_URL` is missing.
+Stripe-style simulator/webhook verification also requires `STRIPE_SAMPLE_WEBHOOK_SECRET` in the API
+process. If `pnpm simulator:all` returns `misconfigured_signature_secret`, stop the API, set
+`STRIPE_SAMPLE_WEBHOOK_SECRET` in that API terminal, restart `pnpm dev:api`, then rerun the
+simulator.
+
+Additional local configuration:
+
+- `LOG_LEVEL=debug`
+- `WEBHOOK_MAX_BODY_BYTES=1048576`
+- `WEBHOOK_RATE_LIMIT_WINDOW_MS=60000`
+- `WEBHOOK_RATE_LIMIT_MAX_REQUESTS=120`
+
+Health and readiness:
+
+- `GET /healthz` is a lightweight process health check.
+- `GET /readyz` checks database and queue reachability and returns `503` with safe dependency
+  status when Postgres or Redis is unavailable.
+
+Webhook ingress protection:
+
+- Every API response includes an `x-request-id` header. Incoming `x-request-id` is preserved when
+  valid; otherwise the API generates one.
+- Webhook errors return safe JSON with `correlationId` and no stack traces or secrets.
+- Oversized webhook bodies return `413 payload_too_large` before enqueueing.
+- Local in-memory rate limiting protects `POST /webhooks/:provider` and returns `429 rate_limited`
+  with `Retry-After` when exceeded.
+- If persistence succeeds but BullMQ enqueue fails, the event is not reported as queued. The API
+  records `queue_enqueue_failed` history and returns a safe `503`.
+
+Worker hardening:
+
+- Worker startup validates database and Redis connectivity before reporting ready.
+- Worker shutdown handles `SIGINT` and `SIGTERM`, closes BullMQ, Redis, and Postgres resources, is
+  idempotent, and uses a bounded timeout.
+- Delivery jobs carry optional `correlationId`; worker logs include correlation, job, event,
+  provider, and error-code fields without printing payloads or secrets.
+
+More detail is in `docs/reliability-hardening.md`; manual reliability checks are in
+`docs/manual-verification-checklist.md`.
+
+Phase 7 validated manual runtime flow:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
+$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
+$env:REDIS_URL = "redis://localhost:6379"
+$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
+pnpm db:migrate
+pnpm dev:api
+```
+
+In a separate worker terminal:
+
+```powershell
+$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
+$env:REDIS_URL = "redis://localhost:6379"
+pnpm dev:worker
+```
+
+In a separate simulator/check terminal:
+
+```powershell
+$env:DATABASE_URL = "postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor"
+$env:REDIS_URL = "redis://localhost:6379"
+$env:STRIPE_SAMPLE_WEBHOOK_SECRET = "whsec_local_test_secret"
+curl.exe -i -H "x-request-id: manual-readyz-check" http://localhost:3000/readyz
+curl.exe -i -H "x-request-id: manual-dashboard-check" http://localhost:3000/dashboard
+pnpm simulator:all
+```
 
 ## Phase 0 Validation Commands
 

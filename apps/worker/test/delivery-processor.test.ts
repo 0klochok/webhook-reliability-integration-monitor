@@ -418,6 +418,57 @@ describe("delivery processor", () => {
     expect(history.map((entry) => entry.toStatus)).toContain("delivered");
   });
 
+  it("keeps failing until a manual replay job succeeds for the demo replay scenario", async () => {
+    const event = await createPersistedQueuedEvent(
+      "fail-until-manual-replay-success",
+      "worker-replay-demo-success-1"
+    );
+    const dependencies = createDependencies();
+
+    await expect(processDeliveryJob(dependencies, createJob(event, 0))).rejects.toBeInstanceOf(
+      RetryableMockDeliveryError
+    );
+    await expect(processDeliveryJob(dependencies, createJob(event, 1))).rejects.toBeInstanceOf(
+      RetryableMockDeliveryError
+    );
+    await expect(processDeliveryJob(dependencies, createJob(event, 2))).rejects.toBeInstanceOf(
+      RetryableMockDeliveryError
+    );
+
+    const deadLettered = await dependencies.webhookEvents.getById(event.id);
+    expect(deadLettered?.currentStatus).toBe("dead_lettered");
+
+    const replay = await dependencies.manualReplays.createManualReplay({
+      originalEventId: event.id,
+      requestedBy: "local-operator",
+      status: "queued",
+      requestedAt: new Date(baseTime)
+    });
+
+    await expect(
+      processDeliveryJob(dependencies, createReplayJob(event, replay.id, 0, 4))
+    ).resolves.toMatchObject({
+      outcome: "delivered",
+      attemptNumber: 4
+    });
+
+    const updatedEvent = await dependencies.webhookEvents.getById(event.id);
+    const attempts = await dependencies.deliveryAttempts.listAttemptsForEvent(event.id);
+    const replayRows = await dependencies.manualReplays.listReplaysForOriginalEvent(event.id);
+
+    expect(updatedEvent?.currentStatus).toBe("delivered");
+    expect(attempts.map((attempt) => attempt.status)).toEqual([
+      "failed_retryable",
+      "failed_retryable",
+      "failed_retryable",
+      "succeeded"
+    ]);
+    expect(replayRows[0]).toMatchObject({
+      id: replay.id,
+      status: "completed"
+    });
+  });
+
   it("marks manual replay failed and updates the dead-letter record on final replay failure", async () => {
     const event = await createPersistedEventWithStatus(
       "always-retryable-fail",

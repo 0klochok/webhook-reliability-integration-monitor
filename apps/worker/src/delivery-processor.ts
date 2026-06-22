@@ -414,7 +414,8 @@ export const processDeliveryJob = async (
   const deliveryResult = await dependencies.downstreamClient.deliver({
     event,
     attemptNumber,
-    targetUrl: dependencies.targetUrl
+    targetUrl: dependencies.targetUrl,
+    manualReplayId: job.data.manualReplayId
   });
 
   if (deliveryResult.ok) {

@@ -6,7 +6,8 @@ export const mockDeliveryBehaviors = [
   "fail-once-then-success",
   "fail-twice-then-success",
   "always-retryable-fail",
-  "permanent-fail"
+  "permanent-fail",
+  "fail-until-manual-replay-success"
 ] as const;
 
 export type MockDeliveryBehavior = (typeof mockDeliveryBehaviors)[number];
@@ -15,6 +16,7 @@ export interface MockDownstreamDeliveryInput {
   readonly event: WebhookEvent;
   readonly attemptNumber: number;
   readonly targetUrl: string;
+  readonly manualReplayId?: string;
 }
 
 export type MockDownstreamDeliveryResult =
@@ -117,6 +119,8 @@ export const createPayloadDrivenMockDownstreamClient = (): MockDownstreamClient 
         return retryableFailure(behavior, input.attemptNumber);
       case "permanent-fail":
         return permanentFailure();
+      case "fail-until-manual-replay-success":
+        return input.manualReplayId ? success() : retryableFailure(behavior, input.attemptNumber);
     }
   }
 });

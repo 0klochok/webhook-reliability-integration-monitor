@@ -10,6 +10,7 @@
     }
   },
   "scripts": {
+    "queue:reset": "tsx src/scripts/reset.ts",
     "test": "vitest run test",
     "typecheck": "tsc -b ../../tsconfig.json --pretty false"
   },

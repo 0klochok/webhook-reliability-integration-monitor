@@ -111,7 +111,15 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
-  tools/simulator: {}
+  tools/simulator:
+    dependencies:
+      '@webhook-monitor/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
 
 packages:
 

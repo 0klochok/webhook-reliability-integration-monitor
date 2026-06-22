@@ -4,16 +4,16 @@
 
 ## Meta
 
-- Last updated: 2026-06-21 Europe/Kyiv
+- Last updated: 2026-06-22 Europe/Kyiv
 - Owner: Local project owner
 - Contributors: Codex
 - Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
 - Current branch: `main`
-- Current phase: Phase 5 — Dashboard and manual replay
-- Overall status: green
-- Quality gate status: green
-- Completion: 100%
-- Main blocker: none
+- Current phase: Phase 6 — Webhook simulator and failure scenarios
+- Overall status: yellow
+- Quality gate status: partial; Docker-dependent gates blocked
+- Completion: 95%
+- Main blocker: Docker Desktop daemon unavailable in the current local session
 
 ## Update rules
 
@@ -25,19 +25,19 @@
 
 ## 1. Current objective
 
-- Phase objective: Make webhook reliability visible and operator-actionable through a local Hono-rendered dashboard and manual replay flow.
+- Phase objective: Make the local webhook demo repeatable with deterministic simulator commands and demo documentation.
 - Deadline / target date: none
-- Definition of done: Dashboard summary/list/detail/dead-letter routes exist; manual replay creates audit rows, replay-specific queue jobs, worker replay attempts, status history, and safe errors; README documents Phase 5 behavior and validation.
-- Primary user-visible signal: `http://localhost:3000/dashboard` renders local webhook health and operator replay actions.
-- Secondary checks: Docker Postgres/Redis, `pnpm install`, Drizzle generate/migrate, Vitest, Prettier, ESLint, TypeScript, and `git status --short`.
-- Out of scope: simulator commands, GitHub Actions, commits, pushes, tags, deployment, frontend frameworks, provider SDKs, real provider APIs, and paid API usage.
+- Definition of done: Simulator commands cover valid, duplicate, rejected, retry, dead-letter, permanent-failure, and manual replay scenarios; README/docs explain the local demo; tests cover simulator builders and helpers.
+- Primary user-visible signal: `pnpm simulator:all` runs a clean local demo and the dashboard shows received, rejected, retried, dead-lettered, and replayed events.
+- Secondary checks: Docker Postgres/Redis, `pnpm install`, Drizzle generate/migrate/reset, Vitest, Prettier, ESLint, TypeScript, simulator smoke checks, and `git status --short`.
+- Out of scope: GitHub Actions, commits, pushes, tags, deployment, frontend frameworks, provider SDKs, real provider APIs, public tunnels, and paid API usage.
 
 ## 2. Status snapshot
 
-- Summary: Phase 5 dashboard and manual replay behavior is implemented and locally validated. No new dependencies or schema migrations were added.
-- Since last update: Added DB dashboard queries, Hono HTML/JSON dashboard routes, replay-specific queue job IDs, worker replay handling, tests, README Phase 5 docs, and docs-only Phase 5 manual QA recording.
-- Current focus: Ready for user review and manual commit.
-- Main uncertainty: none for Phase 5.
+- Summary: Phase 6 simulator, demo docs, local queue reset helper, and manual-replay demo behavior are implemented. Docker-dependent validation is blocked because Docker Desktop is not running.
+- Since last update: Added simulator CLI, scenario payload/signing helpers, simulator tests, root simulator/demo scripts, docs, README Phase 6 demo section, local BullMQ queue reset, and `fail-until-manual-replay-success` worker behavior.
+- Current focus: User review, then rerun Docker-backed validation after Docker Desktop is available.
+- Main uncertainty: Docker-backed API/worker/simulator smoke results are not yet observed in this local session.
 
 ## 3. Completed phases / milestones
 
@@ -51,6 +51,7 @@
 | Phase 4.1 — Verification   | 2026-06-21 | Docs-only manual QA and validation-status clarification for Phase 4 webhook E2E checks.                | green        | none        |
 | Phase 4.2 — QA recording   | 2026-06-21 | Docs-only recording of provided Phase 4 manual webhook E2E QA evidence and skip reasons.               | green        | none        |
 | Phase 5 — Dashboard/replay | 2026-06-21 | Hono dashboard, dashboard JSON endpoints, manual replay audit, replay queue jobs, and worker replay.   | green        | none        |
+| Phase 6 — Simulator/demo   | 2026-06-22 | Repeatable local simulator commands, failure scenario docs, queue reset, and replay demo behavior.     | partial      | none        |
 
 ## 4. Completed since last update
 
@@ -70,6 +71,8 @@
 - 2026-06-21: Added Phase 4.2 docs-only QA recording patch — evidence: `STATE.md` records provided manual QA pass evidence for success, retry-then-success, and permanent dead-letter flows; `README.md` dead-letter SQL now checks all three manual QA event IDs.
 - 2026-06-21: Implemented and validated Phase 5 dashboard/manual replay — evidence: `apps/api/src/dashboard`, `packages/db/src/repositories/dashboard.ts`, replay updates in `packages/queue` and `apps/worker`, new Vitest coverage, README Phase 5 docs, and required gates passing.
 - 2026-06-21: Added Phase 5 docs-only validation patch — evidence: this `STATE.md` records provided dashboard, browser, manual replay, worker, and SQL verification results; `README.md` keeps SQL examples aligned with real FK columns.
+- 2026-06-22: Implemented Phase 6 simulator/demo behavior — evidence: `tools/simulator/src`, `tools/simulator/test`, root simulator scripts, `docs/demo-script.md`, `docs/failure-scenarios.md`, `docs/manual-verification-checklist.md`, README Phase 6 docs, local queue reset script, and worker replay-demo behavior.
+- 2026-06-22: Completed non-Docker Phase 6 validation — evidence: `pnpm install`, `pnpm db:generate`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, simulator tests, non-Redis/non-Postgres Vitest slice, and API-unreachable simulator smoke check.
 
 ## 5. Changed files
 
@@ -321,10 +324,11 @@
 
 ## 7. Active tasks
 
-| ID       | Priority | Task                                                             | Owner      | Status | ETA  | Notes                                                 |
-| -------- | -------- | ---------------------------------------------------------------- | ---------- | ------ | ---- | ----------------------------------------------------- |
-| TASK-001 | P1       | Review Phase 5 validation result and commit manually when ready. | User       | todo   | none | Do not commit or push from Codex.                     |
-| TASK-002 | P2       | Choose the next phase after Phase 5 is accepted.                 | User/Codex | todo   | none | Keep simulator/deployment/provider scope phase-gated. |
+| ID       | Priority | Task                                                        | Owner      | Status | ETA  | Notes                                                               |
+| -------- | -------- | ----------------------------------------------------------- | ---------- | ------ | ---- | ------------------------------------------------------------------- |
+| TASK-001 | P1       | Review Phase 6 implementation and validation result.        | User       | todo   | none | Do not commit or push from Codex.                                   |
+| TASK-002 | P1       | Start Docker Desktop and rerun Docker-backed Phase 6 gates. | User/Codex | todo   | none | Required for Postgres, Redis, API/worker, and simulator full smoke. |
+| TASK-003 | P2       | Commit manually when ready.                                 | User       | todo   | none | Codex must not commit or push.                                      |
 
 ## 8. Backlog / long horizon
 
@@ -334,9 +338,9 @@
 
 ## 9. Known issues
 
-| ID        | Issue                             | Severity | Owner / layer | Next action | Target |
-| --------- | --------------------------------- | -------- | ------------- | ----------- | ------ |
-| ISSUE-001 | none currently known for Phase 5. | n/a      | n/a           | n/a         | n/a    |
+| ID        | Issue                                                                               | Severity | Owner / layer | Next action                                   | Target  |
+| --------- | ----------------------------------------------------------------------------------- | -------- | ------------- | --------------------------------------------- | ------- |
+| ISSUE-001 | Docker Desktop daemon unavailable; Compose cannot reach `dockerDesktopLinuxEngine`. | medium   | local infra   | Start Docker Desktop and rerun blocked gates. | Phase 6 |
 
 ## 10. Risks
 
@@ -357,6 +361,8 @@
 | DEC-006 | 2026-06-21 | Use BullMQ with stable job IDs and capped custom backoff for Phase 4.  | Matches requested queue/worker stack and keeps retry policy configurable from local env.        | BullMQ rejects `:` in custom IDs, so job IDs use `delivery-<eventId>`. |
 | DEC-007 | 2026-06-21 | Keep downstream delivery payload-driven and local-only.                | Demonstrates success, retry, permanent failure, and dead-letter behavior without external APIs. | Real provider delivery remains deferred.                               |
 | DEC-008 | 2026-06-21 | Keep Phase 5 dashboard server-rendered and local-demo unauthenticated. | Matches phase constraints and avoids frontend framework/auth scope creep.                       | Do not expose the dashboard publicly without later auth hardening.     |
+| DEC-009 | 2026-06-22 | Build the simulator as a local TypeScript CLI under `tools/simulator`. | Reuses current pnpm/tsx/Vitest tooling and avoids provider SDKs or paid APIs.                   | Full scenario smoke requires local API, worker, PostgreSQL, and Redis. |
+| DEC-010 | 2026-06-22 | Make `demo:reset` clear DB tables and the local BullMQ queue.          | Repeatable demos need clean persistence and queue state.                                        | Reset remains local-only and refuses non-local targets.                |
 
 ## 12. Open questions
 
@@ -366,15 +372,15 @@
 
 ## 13. Next 3 actions
 
-1. User: Review Phase 5 validation summary — expected result: Phase 5 accepted as complete.
-2. User: Commit manually when ready — expected result: dashboard/manual replay behavior captured in Git history.
-3. User/Codex: Choose the next phase — expected result: simulator, deployment, or provider scope remains explicitly phase-gated.
+1. User: Start Docker Desktop — expected result: `docker compose -f .\infra\docker-compose.yml up -d postgres redis` succeeds.
+2. User/Codex: Rerun blocked gates — expected result: `pnpm db:migrate`, `pnpm db:reset`, `pnpm test -- --run`, API/worker smoke, and simulator smoke complete.
+3. User: Review and commit manually when ready — expected result: Phase 6 simulator/demo behavior captured in Git history.
 
 ## 14. Handoff notes
 
-- Start here next: `TASK-001`
-- Read first: `README.md`, `apps/api/src/dashboard/routes.ts`, `packages/db/src/repositories/dashboard.ts`, `packages/queue/src/delivery-job.ts`, and `apps/worker/src/delivery-processor.ts`
-- Commands to run first for next-phase setup check: `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test -- --run`
+- Start here next: `TASK-002`
+- Read first: `README.md`, `docs/demo-script.md`, `tools/simulator/src/index.ts`, `tools/simulator/src/scenarios`, `packages/queue/src/scripts/reset.ts`, and `apps/worker/src/mock-downstream-client.ts`
+- Commands to run first for next-phase setup check: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`; `pnpm db:migrate`; `pnpm demo:reset`; `pnpm test -- --run`; `pnpm simulator:all`
 - Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior outside the approved phase.
 - Watch for: next-phase scope creep and any request that would introduce real provider credentials, paid API usage, provider SDKs, or deployment automation before those are approved.
 - Suggested next prompt: `Start the next phase after reviewing Phase 5 validation and choosing simulator, demo script, or hardening scope.`

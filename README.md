@@ -39,6 +39,13 @@ let the worker process the event without weakening normal webhook idempotency. P
 not add simulator commands, frontend frameworks, provider SDKs, real provider calls, paid API usage,
 GitHub Actions, deployment, or production authentication.
 
+Phase 6 adds a repeatable local webhook simulator in `tools/simulator`. The simulator sends fake
+provider payloads to the local Hono API, signs Stripe-style sample events with a fake local secret,
+demonstrates duplicate prevention, validation failures, retry success, retry exhaustion,
+permanent-failure dead-lettering, and JSON-route manual replay. Phase 6 still does not add provider
+SDKs, real provider calls, paid API usage, public tunnels, GitHub Actions, deployment, Next.js,
+React, or production authentication.
+
 ## Problem Statement
 
 Business automations often depend on webhooks from payment providers, CRMs, scheduling tools, and
@@ -481,6 +488,108 @@ Manual verification checklist:
 - Confirm a replay-specific queue job is enqueued.
 - Confirm the worker processes the replay.
 - Confirm event status and history update.
+
+## Phase 6 Webhook Simulator and Demo Script
+
+Phase 6 turns the manual webhook examples into deterministic local simulator commands. The simulator
+targets `http://localhost:3000` by default, uses fake local payloads only, and does not require a
+public tunnel such as ngrok. It never calls Stripe, Shopify, Calendly, HubSpot, CRM, or other paid
+provider APIs.
+
+Default simulator configuration:
+
+- `SIMULATOR_API_BASE_URL=http://localhost:3000`
+- `STRIPE_SAMPLE_WEBHOOK_SECRET=whsec_local_test_secret`
+- `SIMULATOR_TIMEOUT_MS=10000`
+- `SIMULATOR_POLL_TIMEOUT_MS=30000`
+- `SIMULATOR_POLL_INTERVAL_MS=500`
+
+Clean start from PowerShell:
+
+```powershell
+Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
+
+docker compose -f .\infra\docker-compose.yml up -d postgres redis
+pnpm install
+pnpm db:migrate
+pnpm db:reset
+```
+
+For a fully clean simulator run, also clear local BullMQ jobs:
+
+```powershell
+pnpm demo:reset
+```
+
+`pnpm demo:reset` runs the local-only database reset and local-only queue reset. The database reset
+refuses non-local PostgreSQL targets; the queue reset refuses non-local Redis targets.
+
+Terminal 1, API:
+
+```powershell
+pnpm dev:api
+```
+
+Terminal 2, worker:
+
+```powershell
+pnpm dev:worker
+```
+
+Both commands are long-running and should stay open in separate PowerShell terminals.
+
+Terminal 3, simulator scenarios:
+
+```powershell
+pnpm simulator:stripe-valid
+pnpm simulator:success
+pnpm simulator:duplicate
+pnpm simulator:invalid-signature
+pnpm simulator:invalid-payload
+pnpm simulator:mock-crm-success
+pnpm simulator:retry-success
+pnpm simulator:dead-letter
+pnpm simulator:permanent-failure
+pnpm simulator:manual-replay
+```
+
+Run the full clean demo sequence:
+
+```powershell
+pnpm simulator:all
+```
+
+`pnpm simulator:all` expects a clean demo database. Run `pnpm demo:reset` first if it reports
+existing events.
+
+Dashboard URLs:
+
+- `http://localhost:3000/dashboard`
+- `http://localhost:3000/dashboard/events`
+- `http://localhost:3000/dashboard/dead-letter`
+
+What to look for:
+
+- Success and mock CRM events become `delivered`.
+- Duplicate events add a duplicate audit entry without a second delivery job.
+- Invalid signature and invalid payload events are rejected and not queued.
+- Retry success records failed attempt(s), then `delivered`.
+- Dead-letter and permanent-failure scenarios appear in the dead-letter page.
+- Manual replay creates a replay audit row, queues a replay-specific job, and reaches `delivered`.
+
+Stop local services:
+
+```powershell
+docker compose -f .\infra\docker-compose.yml down
+```
+
+Troubleshooting:
+
+- If a simulator command says the API is unreachable, start `pnpm dev:api`.
+- If status polling times out at `queued`, `processing`, or `retry_scheduled`, start
+  `pnpm dev:worker`.
+- If deterministic scenario IDs already exist, run `pnpm demo:reset`.
+- Do not replace fake local secrets with real provider secrets.
 
 ## Phase 0 Validation Commands
 

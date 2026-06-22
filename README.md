@@ -415,29 +415,38 @@ pnpm docker:down
 
 Common root scripts:
 
-| Script                      | Purpose                                 |
-| --------------------------- | --------------------------------------- |
-| `pnpm format`               | Format repository files with Prettier   |
-| `pnpm format:check`         | Check Prettier formatting               |
-| `pnpm lint`                 | Run ESLint                              |
-| `pnpm typecheck`            | Run TypeScript project type checking    |
-| `pnpm test`                 | Run Vitest                              |
-| `pnpm dev:api`              | Start the long-running local Hono API   |
-| `pnpm dev:worker`           | Start the long-running BullMQ worker    |
-| `pnpm db:generate`          | Generate Drizzle migrations             |
-| `pnpm db:migrate`           | Apply database migrations               |
-| `pnpm db:reset`             | Reset local application tables          |
-| `pnpm db:seed`              | Seed fake local demo data               |
-| `pnpm db:studio`            | Open Drizzle Studio                     |
-| `pnpm queue:reset`          | Clear the local delivery queue          |
-| `pnpm demo:reset`           | Reset local DB tables and queue         |
-| `pnpm demo:seed`            | Seed fake local demo data               |
-| `pnpm demo:run`             | Run `simulator:all`                     |
-| `pnpm docker:up`            | Start Docker Compose services           |
-| `pnpm docker:ps`            | Show Docker Compose service status      |
-| `pnpm docker:down`          | Stop Docker Compose services            |
-| `pnpm simulator:<scenario>` | Run a specific local simulator scenario |
-| `pnpm simulator:all`        | Run the full local simulator sequence   |
+| Script                             | Purpose                                     |
+| ---------------------------------- | ------------------------------------------- |
+| `pnpm format`                      | Format repository files with Prettier       |
+| `pnpm format:check`                | Check Prettier formatting                   |
+| `pnpm lint`                        | Run ESLint                                  |
+| `pnpm typecheck`                   | Run TypeScript project type checking        |
+| `pnpm test`                        | Run Vitest                                  |
+| `pnpm dev:api`                     | Start the long-running local Hono API       |
+| `pnpm dev:worker`                  | Start the long-running BullMQ worker        |
+| `pnpm db:generate`                 | Generate Drizzle migrations                 |
+| `pnpm db:migrate`                  | Apply database migrations                   |
+| `pnpm db:reset`                    | Reset local application tables              |
+| `pnpm db:seed`                     | Seed fake local demo data                   |
+| `pnpm db:studio`                   | Open Drizzle Studio                         |
+| `pnpm queue:reset`                 | Clear the local delivery queue              |
+| `pnpm demo:reset`                  | Reset local DB tables and queue             |
+| `pnpm demo:seed`                   | Seed fake local demo data                   |
+| `pnpm demo:run`                    | Run `simulator:all`                         |
+| `pnpm docker:up`                   | Start Docker Compose services               |
+| `pnpm docker:ps`                   | Show Docker Compose service status          |
+| `pnpm docker:down`                 | Stop Docker Compose services                |
+| `pnpm simulator:stripe-valid`      | Run a signed Stripe-style sample event      |
+| `pnpm simulator:success`           | Run a successful generic webhook event      |
+| `pnpm simulator:duplicate`         | Run a duplicate generic webhook event       |
+| `pnpm simulator:invalid-signature` | Run an invalid Stripe-style signature event |
+| `pnpm simulator:invalid-payload`   | Run an invalid generic payload event        |
+| `pnpm simulator:mock-crm-success`  | Run a successful mock CRM event             |
+| `pnpm simulator:retry-success`     | Run a retry-then-success event              |
+| `pnpm simulator:dead-letter`       | Run a retry-exhaustion dead-letter event    |
+| `pnpm simulator:permanent-failure` | Run a permanent downstream failure event    |
+| `pnpm simulator:manual-replay`     | Run a dead-letter plus manual replay event  |
+| `pnpm simulator:all`               | Run the full local simulator sequence       |
 
 ## Troubleshooting
 

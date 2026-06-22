@@ -9,9 +9,9 @@
 - Contributors: Codex
 - Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
 - Current branch: `main`
-- Current phase: Phase 7 — Reliability hardening validation closure
+- Current phase: Phase 8 - Docs-only completion repair
 - Overall status: green
-- Quality gate status: green; Phase 7 automated and manual runtime validation passed
+- Quality gate status: green; Phase 8 docs-only repair validation passed, with runtime/manual gates skipped and documented
 - Completion: 100%
 - Main blocker: none
 
@@ -25,19 +25,19 @@
 
 ## 1. Current objective
 
-- Phase objective: Close Phase 7 reliability hardening by documenting validation results, required local env values, manual runtime checks, and troubleshooting.
+- Phase objective: Repair Phase 8 documentation completion records without changing app behavior, dependencies, scripts, CI, remotes, or real-provider/API usage.
 - Deadline / target date: none
-- Definition of done: STATE, README, manual verification checklist, and reliability hardening docs record the accepted Phase 7 gates, runtime verification, required env vars, env-related failure findings, and remaining limitations.
-- Primary user-visible signal: A local user can follow the docs with `.env.example` values, start Docker/Postgres/Redis/API/worker, verify `/readyz` and `/dashboard`, and run `pnpm simulator:all` successfully.
-- Secondary checks: `pnpm format:check`, docs diff review, `git status --short`, and optional lint/typecheck/test skip reasons for this docs-only cleanup.
+- Definition of done: STATE records Phase 8 documentation polish status, docs updated at a high level, reported automated validation, skipped manual/runtime gates with reasons, and the next manual demo action.
+- Primary user-visible signal: README/package-script docs, `.env.example`, and `docs/*.md` are accurate for local fake/demo usage and do not imply Phase 8 manual demo verification was completed.
+- Secondary checks: package-script cross-check, docs command scan, fake/local `.env.example` review, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`, and `git status --short`.
 - Out of scope: GitHub Actions, commits, pushes, tags, deployment, frontend frameworks, provider SDKs, real provider APIs, public tunnels, and paid API usage.
 
 ## 2. Status snapshot
 
-- Summary: Phase 7 reliability hardening is accepted/complete; validation evidence and required local env setup are now being recorded in project docs/state.
-- Since last update: Phase 7 added error taxonomy, config validation helpers, correlation IDs, structured logger, redaction, API/worker/env readiness checks, safe JSON errors, `/readyz`, bounded webhook body reads, local rate limiting, enqueue failure handling, correlation-aware worker logs, graceful shutdown bounds, and simulator readiness/correlation output.
-- Current focus: Documentation/state cleanup only; user review and manual commit when ready.
-- Main uncertainty: none known for Phase 7 validation.
+- Summary: Phase 8 documentation polish and docs-only completion repair are complete; README script accuracy and the STATE ledger were repaired without app behavior changes.
+- Since last update: README, `.env.example`, and docs under `docs/` were polished for portfolio/demo readiness; `STATE.md` still needed a Phase 8 entry.
+- Current focus: User manual README/demo verification, portfolio capture, review, and manual commit when ready.
+- Main uncertainty: Manual README/demo verification and portfolio capture remain pending until explicitly run.
 
 ## 3. Completed phases / milestones
 
@@ -53,6 +53,7 @@
 | Phase 5 — Dashboard/replay | 2026-06-21 | Hono dashboard, dashboard JSON endpoints, manual replay audit, replay queue jobs, and worker replay.   | green        | none        |
 | Phase 6 — Simulator/demo   | 2026-06-22 | Repeatable local simulator commands, failure scenario docs, queue reset, and replay demo behavior.     | green        | none        |
 | Phase 7 — Reliability      | 2026-06-22 | Config validation, correlation IDs, safe errors, readiness, rate/body limits, redaction, and shutdown. | green        | none        |
+| Phase 8 — Documentation    | 2026-06-22 | Portfolio README/docs polish, demo script, screenshot checklist, troubleshooting, and STATE repair.    | green        | none        |
 
 ## 4. Completed since last update
 
@@ -78,6 +79,9 @@
 - 2026-06-22: Implemented Phase 7 reliability hardening — evidence: core error taxonomy, config validation helpers, correlation IDs, structured logger, secret redaction, API env validation, `x-request-id` middleware, safe JSON errors with `correlationId`, `/readyz`, bounded webhook body reader, local webhook rate limiter, queue enqueue failure handling, queue/DB URL validation and readiness helpers, worker config/readiness checks, correlation-aware worker logs, timeout-bounded graceful shutdown, and simulator `/readyz` preflight/correlation output.
 - 2026-06-22: Accepted Phase 7 validation closure — evidence: automated gates passed (`pnpm install`, `pnpm db:generate`, `pnpm db:migrate`, `pnpm format`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`); manual runtime verification passed with Docker PostgreSQL/Redis, `pnpm dev:api`, `pnpm dev:worker`, HTTP 200 from `/readyz` and `/dashboard`, and successful `pnpm simulator:all`.
 - 2026-06-22: Recorded Phase 7 env findings — evidence: local runtime requires exact `.env.example` values for `DATABASE_URL`, `REDIS_URL`, and `STRIPE_SAMPLE_WEBHOOK_SECRET`; earlier manual failures were caused by missing or incorrect local environment variables, not Phase 7 implementation defects.
+- 2026-06-22: Implemented Phase 8 documentation polish — evidence: `README.md`, `.env.example`, `docs/architecture.md`, `docs/demo-video-script.md`, `docs/screenshot-checklist.md`, `docs/troubleshooting.md`, `docs/demo-script.md`, `docs/failure-scenarios.md`, `docs/manual-verification-checklist.md`, and `docs/reliability-hardening.md`.
+- 2026-06-22: Started Phase 8 docs-only completion repair — evidence: README package-script cross-check, docs command scan, fake/local `.env.example` review, replacement of the non-literal README simulator scenario placeholder with actual simulator scripts, and this `STATE.md` ledger update; manual README/demo verification remains pending.
+- 2026-06-22: Completed Phase 8 docs-only completion repair validation — evidence: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, and `pnpm test -- --run` passed; Vitest reported 29 test files and 154 tests passed; Docker Compose/manual API/worker/simulator/dashboard verification was not run in this docs-only pass.
 
 ## 5. Changed files
 
@@ -122,10 +126,27 @@
 | `README.md`, `STATE.md`                                                                           | Phase 5 manual QA docs record        | updated | Docs-only validation patch; no runtime code, tests, dependencies, migrations, workspace, or infra changes.               |
 | `STATE.md`                                                                                        | Phase 6 validation evidence          | updated | Docs/state-only patch records Phase 6 gate pass evidence, `pnpm build` n/a, and no Git history/remote actions.           |
 | `README.md`, `docs/manual-verification-checklist.md`, `docs/reliability-hardening.md`, `STATE.md` | Phase 7 validation closure           | updated | Docs/state-only cleanup records passed gates, manual runtime verification, required env values, and env troubleshooting. |
+| `README.md`, `.env.example`, `docs/*.md`, `STATE.md`                                              | Phase 8 portfolio docs/ledger        | updated | Docs-only polish and completion repair; no app behavior, dependencies, scripts, CI, or real API usage.                   |
 
 ## 6. Validation and quality gates
 
 ### Required gates
+
+### Phase 8 docs-only completion repair validation
+
+| Gate                          | Command / check                                                                   | Status        | Evidence / notes                                                                                                                                                               |
+| ----------------------------- | --------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| package script docs           | `package.json` / workspace manifests versus `README.md`                           | pass          | README package-script docs now list actual root scripts only; the non-literal simulator scenario placeholder was replaced with concrete simulator script names.                |
+| docs command scan             | `README.md`, `.env.example`, and `docs/*.md` review                               | pass          | No stale or fake commands found in inspected docs after the README script placeholder repair. Manual verification docs are written as checklists, not completed Phase 8 proof. |
+| env example safety            | `.env.example` review                                                             | pass          | Values are fake/local/demo-safe only; no real Stripe, Shopify, Calendly, HubSpot, CRM, paid API, token, or production credential values were found.                            |
+| prior automated docs polish   | Reported `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run` | reported pass | Prior Phase 8 docs polish pass reportedly completed all four gates; reported Vitest result was 29 test files and 154 tests.                                                    |
+| format                        | `pnpm format:check`                                                               | pass          | Exit code 0; `All matched files use Prettier code style!`.                                                                                                                     |
+| lint                          | `pnpm lint`                                                                       | pass          | Exit code 0; `eslint .` completed.                                                                                                                                             |
+| typecheck                     | `pnpm typecheck`                                                                  | pass          | Exit code 0; `tsc -b --pretty false` completed.                                                                                                                                |
+| tests                         | `pnpm test -- --run`                                                              | pass          | Exit code 0; Vitest 4.1.9 reported 29 test files and 154 tests passed.                                                                                                         |
+| Docker Compose/runtime manual | Docker/Postgres/Redis/API/worker/simulator/dashboard verification                 | skipped       | Docs-only repair; starting services and running the portfolio demo was explicitly not part of this pass. README/demo manual verification remains pending.                      |
+| GitHub Actions / CI           | n/a                                                                               | skipped       | Explicitly out of scope; do not add CI in Phase 8 repair.                                                                                                                      |
+| real provider / paid APIs     | n/a                                                                               | skipped       | Explicitly out of scope; project remains mock/no-paid-API local mode.                                                                                                          |
 
 ### Phase 7 reliability hardening validation
 
@@ -392,10 +413,11 @@
 
 ## 7. Active tasks
 
-| ID       | Priority | Task                                        | Owner | Status | ETA  | Notes                             |
-| -------- | -------- | ------------------------------------------- | ----- | ------ | ---- | --------------------------------- |
-| TASK-001 | P1       | Review Phase 7 documentation/state cleanup. | User  | todo   | none | Do not commit or push from Codex. |
-| TASK-002 | P2       | Commit manually when ready.                 | User  | todo   | none | Codex must not commit or push.    |
+| ID       | Priority | Task                                                       | Owner | Status | ETA  | Notes                                      |
+| -------- | -------- | ---------------------------------------------------------- | ----- | ------ | ---- | ------------------------------------------ |
+| TASK-001 | P1       | Run manual README/demo verification and portfolio capture. | User  | todo   | none | Use fake/local `.env.example` values only. |
+| TASK-002 | P2       | Review Phase 8 docs-only repair diff.                      | User  | todo   | none | Do not commit or push from Codex.          |
+| TASK-003 | P2       | Commit and push manually when ready.                       | User  | todo   | none | Codex must not commit or push.             |
 
 ## 8. Backlog / long horizon
 
@@ -405,9 +427,9 @@
 
 ## 9. Known issues
 
-| ID        | Issue                               | Severity | Owner / layer | Next action                | Target |
-| --------- | ----------------------------------- | -------- | ------------- | -------------------------- | ------ |
-| ISSUE-001 | No known Phase 7 validation issues. | low      | n/a           | Continue with user review. | none   |
+| ID        | Issue                                     | Severity | Owner / layer | Next action                               | Target |
+| --------- | ----------------------------------------- | -------- | ------------- | ----------------------------------------- | ------ |
+| ISSUE-001 | No known Phase 8 docs-only repair issues. | low      | n/a           | Complete manual README/demo verification. | none   |
 
 ## 10. Risks
 
@@ -440,15 +462,15 @@
 
 ## 13. Next 3 actions
 
-1. User: Review the Phase 7 documentation/state cleanup — expected result: docs/state wording matches the accepted reliability hardening validation.
-2. User: Commit manually when ready — expected result: Phase 7 reliability hardening and documentation closure captured in Git history.
-3. User/Codex: Choose the next phase — expected result: scope remains phase-gated and local-first.
+1. User: Run manual README/demo verification and capture the portfolio demo/screenshots — expected result: local docs are proven end to end before publishing.
+2. User: Review the Phase 8 docs-only repair diff — expected result: README and STATE wording match the intended completion record.
+3. User: Commit and push manually when ready — expected result: Phase 8 documentation closure captured in Git history without Codex touching remotes.
 
 ## 14. Handoff notes
 
 - Start here next: `TASK-001`
 - Read first: `README.md`, `docs/reliability-hardening.md`, `docs/manual-verification-checklist.md`, `docs/demo-script.md`, and `STATE.md`
-- Commands to run first for next-phase setup check: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`; set the `.env.example` `DATABASE_URL`, `REDIS_URL`, and `STRIPE_SAMPLE_WEBHOOK_SECRET` values in the relevant PowerShell terminals; `pnpm db:migrate`; `pnpm test -- --run`; `pnpm simulator:all`
+- Commands to run first for manual portfolio demo verification: `Copy-Item .env.example .env`; `docker compose -f .\infra\docker-compose.yml up -d postgres redis`; `pnpm db:migrate`; `pnpm demo:reset`; start `pnpm dev:api` and `pnpm dev:worker` in separate PowerShell terminals; then run `pnpm simulator:all`
 - Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior outside the approved phase.
 - Watch for: next-phase scope creep, env drift from `.env.example`, and any request that would introduce real provider credentials, paid API usage, provider SDKs, or deployment automation before those are approved.
-- Suggested next prompt: `Start the next phase after reviewing Phase 7 reliability hardening documentation and choosing the next phase scope.`
+- Suggested next prompt: `Run the manual README/demo verification checklist and capture portfolio screenshots.`

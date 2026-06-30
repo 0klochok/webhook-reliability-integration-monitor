@@ -1,5 +1,25 @@
 # Webhook Reliability Integration Monitor
 
+## 60-second client read
+
+This is a local portfolio demo for reliable webhook middleware: event intake, fake Stripe-style signature verification, Zod validation, idempotency, event history, retry queue, dead-letter handling, manual replay, and a health dashboard.
+
+**Best-fit client problem:** a SaaS, e-commerce, or automation-heavy business depends on webhooks from payment, CRM, booking, commerce, or support tools, but failures are hard to see and recover from.
+
+**Business value demonstrated:** fewer silent integration failures, safer duplicate handling, visible event history, retryable delivery, dead-letter review, and an operator dashboard for integration health.
+
+**Technical proof:** Hono, TypeScript, Zod, PostgreSQL, Redis/BullMQ, signature checks, idempotency keys, retry/backoff, dead-letter records, manual replay, structured logging, readiness checks, and Vitest.
+
+**Demo safety:** all events are local synthetic test events. No real provider credentials, paid API, public tunnel, production webhook, or real customer data is required.
+
+## What a real client version would connect
+
+- Stripe, Shopify, HubSpot, Calendly, Pipedrive, or custom HTTP webhooks
+- Client-specific payload schemas and signature rules
+- Downstream APIs or internal services
+- Alerts for repeated failures, dead-letter events, or missing recent successful events
+- Deployment to a client-owned hosting environment with monitoring and logs
+
 A lightweight local middleware service that receives webhook events, validates payloads, verifies
 fake Stripe-style signatures, stores event history, prevents duplicate processing, retries failed
 deliveries, dead-letters unrecoverable events, and exposes a local server-rendered health dashboard.
@@ -383,6 +403,13 @@ During the demo:
 
 The demo video script is in [docs/demo-video-script.md](docs/demo-video-script.md), and the
 screenshot checklist is in [docs/screenshot-checklist.md](docs/screenshot-checklist.md).
+
+## Portfolio Screenshots TODO
+
+No screenshot assets are currently checked into this repository. Capture the recommended dashboard,
+event detail, dead-letter, manual replay, simulator, and test screenshots after running the local
+demo sequence; use [docs/screenshot-checklist.md](docs/screenshot-checklist.md) as the capture
+checklist.
 
 ## Validation Commands
 

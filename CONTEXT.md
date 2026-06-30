@@ -124,26 +124,26 @@ Keep paths exact. Add only directories/files that matter for implementation, ope
 
 ## 5. Tech stack and dependencies
 
-| Area                      | Current choice                           | Notes                                               |
-| ------------------------- | ---------------------------------------- | --------------------------------------------------- |
-| Frontend                  | Server-rendered dashboard planned        | No UI implementation in Phase 0                     |
-| Backend                   | Hono planned                             | No API implementation in Phase 0                    |
-| Runtime                   | Node.js + TypeScript                     | Local Node observed as `v24.16.0`                   |
-| Package manager           | pnpm                                     | Local pnpm observed as `11.7.0`                     |
-| Frameworks                | Hono planned later                       | Not installed in Phase 1                            |
-| Runtime validation        | Zod                                      | Installed only in `@webhook-monitor/core`           |
-| Database/storage          | PostgreSQL planned                       | Local Docker Compose service only in Phase 0        |
-| Queue/background jobs     | BullMQ planned                           | Not installed in Phase 0                            |
-| Cache                     | Redis planned                            | Local Docker Compose service only in Phase 0        |
-| Search/indexing           | TBD                                      |                                                     |
-| Auth provider             | TBD                                      |                                                     |
-| External services         | TBD                                      |                                                     |
-| Third-party SDKs          | TBD                                      |                                                     |
-| Testing                   | Vitest                                   | Phase 1 has unit tests for core contracts           |
-| Tooling                   | TypeScript, ESLint flat config, Prettier | Root scripts in `package.json`                      |
-| Docker                    | configured                               | `infra/docker-compose.yml` for PostgreSQL and Redis |
-| Hosting/deployment target | TBD                                      |                                                     |
-| CI/CD                     | not configured                           | Keep validation local-first in Phase 0              |
+| Area                      | Current choice                           | Notes                                                          |
+| ------------------------- | ---------------------------------------- | -------------------------------------------------------------- |
+| Frontend                  | Hono server-rendered dashboard           | Local portfolio/demo UI; no Next.js                            |
+| Backend                   | Hono                                     | Webhook ingress, health/readiness, dashboard routes            |
+| Runtime                   | Node.js + TypeScript                     | Local Node observed as `v24.16.0`                              |
+| Package manager           | pnpm                                     | `packageManager` pins `pnpm@11.7.0`                            |
+| Frameworks                | Hono                                     | API and server-rendered dashboard                              |
+| Runtime validation        | Zod                                      | Provider schemas and config validation                         |
+| Database/storage          | PostgreSQL + Drizzle                     | Local Docker Compose PostgreSQL                                |
+| Queue/background jobs     | BullMQ                                   | Local Redis-backed delivery queue and worker                   |
+| Cache                     | Redis                                    | Local Docker Compose Redis for BullMQ                          |
+| Search/indexing           | none                                     | Not needed for the local demo                                  |
+| Auth provider             | none                                     | Dashboard is local-demo only and unauthenticated               |
+| External services         | mock downstream only                     | No real provider or paid APIs                                  |
+| Third-party SDKs          | none for providers                       | Stripe-style sample uses local HMAC implementation             |
+| Testing                   | Vitest                                   | Root test suite covers core, DB, API, queue, worker, simulator |
+| Tooling                   | TypeScript, ESLint flat config, Prettier | Root scripts in `package.json`                                 |
+| Docker                    | configured                               | `infra/docker-compose.yml` for PostgreSQL and Redis            |
+| Hosting/deployment target | none                                     | Local portfolio/demo only                                      |
+| CI/CD                     | not configured                           | Keep validation local-first unless later approved              |
 
 ### Dependency rules
 
@@ -159,21 +159,23 @@ Keep paths exact. Add only directories/files that matter for implementation, ope
 
 All commands should be runnable from the repository root unless stated otherwise.
 
-| Purpose                 | Command                                                                                                                                                  | Notes                                               |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| Install dependencies    | `pnpm install`                                                                                                                                           | Generates `pnpm-lock.yaml`                          |
-| Run dev server          | `TBD`                                                                                                                                                    | No runnable app in Phase 0                          |
-| Run tests               | `pnpm test`                                                                                                                                              | Vitest, no tests expected in Phase 0                |
-| Run unit tests          | `pnpm test`                                                                                                                                              | Same as test until suites split                     |
-| Run integration tests   | `TBD`                                                                                                                                                    | No integration tests in Phase 0                     |
-| Lint                    | `pnpm lint`                                                                                                                                              | ESLint flat config                                  |
-| Format                  | `pnpm format:check`                                                                                                                                      | Use `pnpm format` to write changes                  |
-| Typecheck               | `pnpm typecheck`                                                                                                                                         | TypeScript build mode                               |
-| Build                   | `TBD`                                                                                                                                                    |                                                     |
-| Database migration      | `TBD`                                                                                                                                                    |                                                     |
-| Seed fixtures/test data | `TBD`                                                                                                                                                    |                                                     |
-| Smoke test              | `docker compose -f .\infra\docker-compose.yml up -d; docker compose -f .\infra\docker-compose.yml ps; docker compose -f .\infra\docker-compose.yml down` | Local infra only                                    |
-| Full quality gate       | `pnpm format:check; pnpm lint; pnpm typecheck; pnpm test`                                                                                                | Add Docker Compose validation when infra is touched |
+| Purpose                 | Command                                                                                                          | Notes                                                  |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Install dependencies    | `pnpm install`                                                                                                   | Uses existing `pnpm-lock.yaml`                         |
+| Run API                 | `pnpm dev:api`                                                                                                   | Starts Hono API/dashboard on the configured local port |
+| Run worker              | `pnpm dev:worker`                                                                                                | Starts BullMQ delivery worker                          |
+| Run tests               | `pnpm test -- --run`                                                                                             | Root Vitest suite                                      |
+| Run API tests           | `pnpm api:test`                                                                                                  | Focused API test package script                        |
+| Run worker tests        | `pnpm worker:test`                                                                                               | Focused worker test package script                     |
+| Run queue tests         | `pnpm queue:test`                                                                                                | Focused queue test package script                      |
+| Lint                    | `pnpm lint`                                                                                                      | ESLint flat config                                     |
+| Format                  | `pnpm format:check`                                                                                              | Use `pnpm format` to write changes                     |
+| Typecheck/build check   | `pnpm typecheck`                                                                                                 | Build-equivalent gate; no root `build` script exists   |
+| Database migration      | `pnpm db:migrate`                                                                                                | Applies Drizzle migrations to local PostgreSQL         |
+| Reset demo state        | `pnpm demo:reset`                                                                                                | Destructive local-only DB table and BullMQ queue reset |
+| Seed fixtures/test data | `pnpm demo:seed`                                                                                                 | Optional local demo seed data                          |
+| Smoke test              | `pnpm docker:up`, `pnpm docker:ps`, `pnpm db:migrate`, `pnpm demo:reset`, start API/worker, `pnpm simulator:all` | Local Docker/API/worker/simulator gate                 |
+| Full quality gate       | `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`                                         | Add smoke gate for runtime changes                     |
 
 ### Quality gate definition
 
@@ -183,7 +185,7 @@ A change is considered safe to merge only when the following pass:
 2. `pnpm lint`
 3. `pnpm typecheck`
 4. `pnpm test`
-5. Docker Compose validation when PostgreSQL/Redis infrastructure is changed.
+5. Docker Compose and simulator smoke validation when PostgreSQL, Redis, API, worker, or demo runtime behavior changes.
 
 If no automated quality gate exists yet, state that explicitly and define the current manual check.
 
@@ -222,62 +224,69 @@ If no automated quality gate exists yet, state that explicitly and define the cu
 
 ### Public API contracts
 
-| Method | Path / operation | Purpose | Request schema | Response schema | Errors |
-| ------ | ---------------- | ------- | -------------- | --------------- | ------ |
-| `TBD`  | `TBD`            |         |                |                 |        |
+| Method | Path / operation                                            | Purpose                         | Request schema                | Response schema                 | Errors                                                                                  |
+| ------ | ----------------------------------------------------------- | ------------------------------- | ----------------------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
+| `GET`  | `/health`, `/healthz`                                       | Liveness check                  | none                          | `{ ok, service }`               | none expected                                                                           |
+| `GET`  | `/readyz`                                                   | Database and queue readiness    | none                          | `{ ok, service, dependencies }` | `503` with safe dependency status                                                       |
+| `POST` | `/webhooks/:provider`                                       | Provider webhook intake         | Provider-specific Zod schemas | queued/duplicate response       | `unsupported_provider`, `invalid_signature`, `invalid_payload`, rate/body/config errors |
+| `GET`  | `/dashboard`, `/dashboard/events`, `/dashboard/dead-letter` | Local server-rendered dashboard | query params for list filters | HTML                            | safe JSON/HTML error responses                                                          |
+| `GET`  | `/api/dashboard/*`                                          | Dashboard JSON data             | route/query params            | JSON data envelope              | validation/not-found errors                                                             |
+| `POST` | `/api/dashboard/events/:eventId/replay`                     | Manual replay enqueue           | path event id                 | replay queue result             | `replay_not_allowed`, `replay_enqueue_failed`, not found                                |
 
 ### Internal contracts
 
-| Type                     | Name  | Producer | Consumer | Contract location | Notes |
-| ------------------------ | ----- | -------- | -------- | ----------------- | ----- |
-| Event                    | `TBD` |          |          |                   |       |
-| Job                      | `TBD` |          |          |                   |       |
-| Function/module boundary | `TBD` |          |          |                   |       |
+| Type                     | Name                     | Producer             | Consumer                           | Contract location                           | Notes                                      |
+| ------------------------ | ------------------------ | -------------------- | ---------------------------------- | ------------------------------------------- | ------------------------------------------ |
+| Event                    | `NormalizedWebhookEvent` | provider adapters    | API ingest, DB repositories, queue | `packages/core/src/normalized-event.ts`     | Normalized provider event contract         |
+| Job                      | `DeliveryJobData`        | API/manual replay    | BullMQ worker                      | `packages/queue/src/delivery-job.ts`        | Includes replay metadata and attempt start |
+| Function/module boundary | provider adapters        | raw webhook intake   | validation/signature/normalization | `packages/core/src/adapters.ts`             | Keeps provider-specific parsing in core    |
+| Function/module boundary | dashboard repository     | API dashboard routes | HTML/JSON dashboard views          | `packages/db/src/repositories/dashboard.ts` | Read model for local health dashboard      |
 
 ### Integration boundaries
 
-- **Database:**
-- **External APIs:**
-- **UI/client:**
-- **Background jobs:**
-- **Files/blob storage:**
-- **Notifications/email:**
+- **Database:** PostgreSQL through Drizzle repositories in `packages/db/src/repositories`.
+- **External APIs:** None; downstream delivery is a local mock client.
+- **UI/client:** Server-rendered Hono dashboard, no browser-side app framework.
+- **Background jobs:** BullMQ delivery queue and worker through local Redis.
+- **Files/blob storage:** None.
+- **Notifications/email:** None.
 
 ### Error contract
 
-- **Error shape:**
-- **Error code policy:**
-- **Validation errors:**
-- **Auth errors:**
-- **Retryable errors:**
-- **Non-retryable errors:**
+- **Error shape:** API errors return `{ ok: false, error: { code, message }, correlationId }` with optional safe issue details.
+- **Error code policy:** Stable snake_case codes; do not expose secrets or raw dependency URLs.
+- **Validation errors:** Zod validation maps to `invalid_payload` or config validation errors.
+- **Auth errors:** No user auth exists; webhook signature failures map to `invalid_signature`.
+- **Retryable errors:** Worker records retryable downstream failures and schedules BullMQ retries.
+- **Non-retryable errors:** Permanent downstream failures or exhausted retries become dead-letter records.
 
 ### Backward compatibility rules
 
-- **Breaking-change policy:**
-- **Deprecation policy:**
-- **Versioning policy:**
+- **Breaking-change policy:** Keep local simulator, README commands, and tests in sync with route/contract changes.
+- **Deprecation policy:** Prefer additive local-demo compatibility routes such as `/health` beside `/healthz`.
+- **Versioning policy:** No public versioned API yet; provider/job contracts are protected by tests.
 
 ---
 
 ## 9. Data and storage
 
-- **Schema summary:**
-- **Canonical schema location:**
-- **Migration policy:**
-- **Migration command:** `TBD`
-- **Fixture/test data policy:**
-- **Seed data command:** `TBD`
-- **Retention policy:**
-- **Backup policy:**
-- **Recovery procedure:**
-- **Data deletion procedure:**
+- **Schema summary:** Webhook events, status history, delivery attempts, dead-letter events, manual replays, and Drizzle migrations.
+- **Canonical schema location:** `packages/db/src/schema.ts`.
+- **Migration policy:** Express schema in Drizzle schema and apply generated migrations through the db package.
+- **Migration command:** `pnpm db:migrate`
+- **Fixture/test data policy:** Synthetic local-only data only; no real provider payloads or secrets.
+- **Seed data command:** `pnpm demo:seed`
+- **Retention policy:** Not production-defined; local demo data may be reset.
+- **Backup policy:** Not configured for local demo data.
+- **Recovery procedure:** Recreate local state with `pnpm docker:up`, `pnpm db:migrate`, and simulator/seed commands.
+- **Data deletion procedure:** `pnpm demo:reset` clears local application tables and BullMQ queue state.
 
 ### Data classification
 
-| Data type | Classification                                   | Storage location | Retention | Notes |
-| --------- | ------------------------------------------------ | ---------------- | --------- | ----- |
-| `<data>`  | public \| internal \| confidential \| restricted |                  |           |       |
+| Data type              | Classification     | Storage location            | Retention              | Notes                                                           |
+| ---------------------- | ------------------ | --------------------------- | ---------------------- | --------------------------------------------------------------- |
+| Local webhook payloads | internal demo data | PostgreSQL `webhook_events` | local reset-controlled | Synthetic only; payload views avoid exposing secret-like values |
+| Local credentials      | confidential       | `.env` only                 | user-managed           | Never commit; `.env.example` uses fake placeholders             |
 
 ---
 
@@ -333,52 +342,54 @@ If no automated quality gate exists yet, state that explicitly and define the cu
 
 For detailed production operations, use `RUNBOOK.md`. This section is the compact operational summary.
 
-| Operation     | Command / procedure                                            | Notes                                                           |
-| ------------- | -------------------------------------------------------------- | --------------------------------------------------------------- |
-| Start locally | `pnpm docker:up`                                               | Starts local PostgreSQL and Redis only                          |
-| Stop locally  | `pnpm docker:down`                                             | Stops local PostgreSQL and Redis without deleting named volumes |
-| Safe reset    | `TBD`                                                          | Include data-loss warnings                                      |
-| Build         | `TBD`                                                          |                                                                 |
-| Test          | `pnpm test`                                                    |                                                                 |
-| Deploy        | `TBD`                                                          |                                                                 |
-| Rollback      | `TBD`                                                          |                                                                 |
-| View logs     | `docker compose -f .\infra\docker-compose.yml logs --tail=100` |                                                                 |
-| Health check  | `pnpm docker:ps`                                               | Local infra service status                                      |
-| Smoke test    | `pnpm docker:up; pnpm docker:ps; pnpm docker:down`             |                                                                 |
+| Operation    | Command / procedure                                            | Notes                                                           |
+| ------------ | -------------------------------------------------------------- | --------------------------------------------------------------- |
+| Start infra  | `pnpm docker:up`                                               | Starts local PostgreSQL and Redis                               |
+| Start API    | `pnpm dev:api`                                                 | Local Hono API/dashboard                                        |
+| Start worker | `pnpm dev:worker`                                              | Local BullMQ worker                                             |
+| Stop locally | `pnpm docker:down`                                             | Stops local PostgreSQL and Redis without deleting named volumes |
+| Safe reset   | `pnpm demo:reset`                                              | Destructive local-only reset of app tables and queue state      |
+| Build        | `pnpm typecheck`                                               | Build-equivalent gate; no root `build` script exists            |
+| Test         | `pnpm test -- --run`                                           | Root Vitest suite                                               |
+| Deploy       | not configured                                                 | Local portfolio/demo only                                       |
+| Rollback     | Revert local changes manually before commit                    | Codex must not rewrite Git history                              |
+| View logs    | `docker compose -f .\infra\docker-compose.yml logs --tail=100` |                                                                 |
+| Health check | `GET /health`, `GET /healthz`, `GET /readyz`                   | API liveness/readiness                                          |
+| Smoke test   | `pnpm simulator:all`                                           | Run after Docker services, API, and worker are running          |
 
 ### Environments
 
-| Environment | URL / identifier | Purpose                   | Data source | Notes |
-| ----------- | ---------------- | ------------------------- | ----------- | ----- |
-| Local       |                  | Development               |             |       |
-| Staging     |                  | Pre-production validation |             |       |
-| Production  |                  | User-facing runtime       |             |       |
+| Environment | URL / identifier        | Purpose                   | Data source                                | Notes                              |
+| ----------- | ----------------------- | ------------------------- | ------------------------------------------ | ---------------------------------- |
+| Local       | `http://localhost:3000` | Development/demo          | `.env` or `.env.example` fake local values | Only supported runtime today       |
+| Staging     | not configured          | Pre-production validation | n/a                                        | Add only in a later approved phase |
+| Production  | not configured          | User-facing runtime       | n/a                                        | Not production-ready               |
 
 ### Operational safety
 
-- **Safe stop/reset rules:**
-- **Rollback trigger:**
-- **Incident owner:**
-- **Escalation path:**
-- **Known fragile operations:**
+- **Safe stop/reset rules:** Stop foreground API/worker with Ctrl+C; use `pnpm docker:down` for local infra; use `pnpm demo:reset` only when local demo/test data loss is acceptable.
+- **Rollback trigger:** Failed local gate or unwanted behavior change before manual commit.
+- **Incident owner:** Local project owner.
+- **Escalation path:** Stop and ask before destructive, credentialed, external-service, or Git history actions.
+- **Known fragile operations:** Local port conflicts on `3000`, `5432`, or `6379`; pnpm engine warning from Codex bundled pnpm shim.
 
 ---
 
 ## 13. Performance, reliability, and cost constraints
 
-| Area                | Target / constraint | Measurement | Notes |
-| ------------------- | ------------------- | ----------- | ----- |
-| Latency SLO         | TBD                 |             |       |
-| Throughput target   | TBD                 |             |       |
-| Availability target | TBD                 |             |       |
-| Error budget        | TBD                 |             |       |
-| Resource limits     | TBD                 |             |       |
-| Cost constraint     | TBD                 |             |       |
+| Area                | Target / constraint           | Measurement               | Notes                                   |
+| ------------------- | ----------------------------- | ------------------------- | --------------------------------------- |
+| Latency SLO         | not defined                   | local smoke only          | Portfolio/demo project                  |
+| Throughput target   | not defined                   | local smoke only          | No load-test gate yet                   |
+| Availability target | local process uptime only     | health/readiness routes   | No production deployment                |
+| Error budget        | not defined                   | n/a                       | No production SLO                       |
+| Resource limits     | local Docker/Desktop capacity | Docker and process health | Keep demo lightweight                   |
+| Cost constraint     | zero paid API usage           | dependency and env review | Real provider/paid APIs remain disabled |
 
-- **Known bottlenecks:**
-- **Scalability assumptions:**
-- **Load test status:**
-- **Observability coverage:**
+- **Known bottlenecks:** Not load-tested; BullMQ/PostgreSQL/Redis use local defaults.
+- **Scalability assumptions:** Demo-scale traffic only.
+- **Load test status:** Not configured.
+- **Observability coverage:** Structured logs, correlation IDs, status history, delivery attempts, dashboard summary.
 
 ---
 
@@ -386,36 +397,43 @@ For detailed production operations, use `RUNBOOK.md`. This section is the compac
 
 Record durable decisions here or link to full ADR files. Prefer separate ADR files for large decisions.
 
-| ID      | Date       | Decision | Context | Rationale | Consequences | Status                             |
-| ------- | ---------- | -------- | ------- | --------- | ------------ | ---------------------------------- |
-| ADR-001 | YYYY-MM-DD |          |         |           |              | proposed \| accepted \| superseded |
+| ID      | Date       | Decision                                              | Context                                                   | Rationale                                                     | Consequences                                                          | Status   |
+| ------- | ---------- | ----------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- | -------- |
+| ADR-001 | 2026-06-20 | Use pnpm workspace with Hono, Drizzle, BullMQ, Vitest | Local webhook reliability portfolio project               | Matches requested stack and keeps implementation local-first  | No Next.js, CI, provider SDKs, or deployment by default               | accepted |
+| ADR-002 | 2026-06-22 | Keep simulator and downstream delivery fake/local     | Real provider and paid API usage is disallowed by default | Demonstrates reliability behavior without credentials or cost | Production provider integrations require a later approved phase       | accepted |
+| ADR-003 | 2026-06-30 | Treat `pnpm typecheck` as the build-equivalent gate   | No root `build` script exists                             | Avoids inventing a build artifact before deployment exists    | Add a real build script only when deployable artifacts are introduced | accepted |
 
 ---
 
 ## 15. Current constraints
 
-| Constraint                                       | Type       | Impact                                             | Notes                                                  |
-| ------------------------------------------------ | ---------- | -------------------------------------------------- | ------------------------------------------------------ |
-| Real provider APIs disabled by default           | security   | Prevents accidental paid or credentialed API usage | Use mocks/local-only values unless explicitly approved |
-| GitHub Actions not configured in Phase 0         | deployment | Validation is local-first                          | Add CI only in a later requested phase                 |
-| No ingress, persistence, queue, or UI in Phase 1 | technical  | Core contracts only                                | Implement handlers/workers/dashboard in later phases   |
+| Constraint                               | Type       | Impact                                             | Notes                                                    |
+| ---------------------------------------- | ---------- | -------------------------------------------------- | -------------------------------------------------------- |
+| Real provider APIs disabled by default   | security   | Prevents accidental paid or credentialed API usage | Use mocks/local-only values unless explicitly approved   |
+| GitHub Actions not configured in Phase 0 | deployment | Validation is local-first                          | Add CI only in a later requested phase                   |
+| Dashboard has no production auth         | security   | Do not expose publicly                             | Add auth/CSRF/deployment hardening before any public use |
+| No CI/CD configured                      | deployment | Local gates are the source of truth                | Add only in a later approved phase                       |
+| No real provider APIs or SDKs            | scope      | Simulator/mock behavior only                       | Requires explicit approval to expand                     |
 
 ---
 
 ## 16. Current risks
 
-| ID       | Risk | Probability        | Impact             | Mitigation | Owner | Status                          |
-| -------- | ---- | ------------------ | ------------------ | ---------- | ----- | ------------------------------- |
-| RISK-001 |      | low \| med \| high | low \| med \| high |            |       | open \| monitoring \| mitigated |
+| ID       | Risk                                                                   | Probability         | Impact | Mitigation                                                                                    | Owner      | Status     |
+| -------- | ---------------------------------------------------------------------- | ------------------- | ------ | --------------------------------------------------------------------------------------------- | ---------- | ---------- |
+| RISK-001 | Local port conflict on `3000`, `5432`, or `6379` blocks smoke runs     | low                 | medium | Report conflict; do not kill unrelated processes without approval                             | User/Codex | monitoring |
+| RISK-002 | Codex bundled pnpm shim uses Node `v24.14.0` and emits engine warnings | high in Codex shell | low    | Use system/Corepack pnpm in manual shell or update Codex runtime; do not lower project engine | User       | open       |
+| RISK-003 | Dashboard is unauthenticated local-demo UI                             | medium if exposed   | high   | Keep local only; add auth/CSRF before any deployment                                          | User       | open       |
 
 ---
 
 ## 17. Known limitations
 
-| ID        | Limitation | User impact | Workaround | Target resolution |
-| --------- | ---------- | ----------- | ---------- | ----------------- |
-| LIMIT-001 |            |             |            |                   |
-| LIMIT-002 |            |             |            |                   |
+| ID        | Limitation                                       | User impact                                        | Workaround                         | Target resolution                              |
+| --------- | ------------------------------------------------ | -------------------------------------------------- | ---------------------------------- | ---------------------------------------------- |
+| LIMIT-001 | No production authentication or authorization    | Dashboard must stay local-only                     | Do not expose externally           | Later production-hardening phase               |
+| LIMIT-002 | No automated browser visual/a11y regression gate | Human review still needed before portfolio capture | Use `docs/screenshot-checklist.md` | Later UI QA phase                              |
+| LIMIT-003 | No root `build` script                           | `pnpm typecheck` is the build-equivalent gate      | Use `pnpm typecheck`               | Add build only when deployable artifacts exist |
 
 ---
 
@@ -423,9 +441,10 @@ Record durable decisions here or link to full ADR files. Prefer separate ADR fil
 
 Track unknowns that block accurate implementation or operation. Resolve or move them into the relevant section when answered.
 
-| ID    | Question | Owner | Needed by  | Status |
-| ----- | -------- | ----- | ---------- | ------ |
-| Q-001 |          |       | YYYY-MM-DD | open   |
+| ID    | Question                                                                                          | Owner | Needed by                      | Status |
+| ----- | ------------------------------------------------------------------------------------------------- | ----- | ------------------------------ | ------ |
+| Q-001 | Should the next phase add automated browser screenshots, or keep screenshot/video capture manual? | User  | Portfolio capture phase        | open   |
+| Q-002 | Should CI/GitHub Actions be added after local QA, or remain out of scope?                         | User  | Future release-hardening phase | open   |
 
 ---
 

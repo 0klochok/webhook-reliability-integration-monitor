@@ -125,6 +125,19 @@ describe("webhook ingress API", () => {
     });
   });
 
+  it("returns the same minimal response from the health alias", async () => {
+    const { app } = createApiTestHarness({ client });
+
+    const response = await app.request("/health");
+    const body = (await response.json()) as { readonly ok: boolean; readonly service: string };
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      ok: true,
+      service: "webhook-reliability-api"
+    });
+  });
+
   it("returns readiness success when database and queue checks pass", async () => {
     const { app } = createApiTestHarness({ client });
 

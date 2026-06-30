@@ -4,14 +4,14 @@
 
 ## Meta
 
-- Last updated: 2026-06-22 Europe/Kyiv
+- Last updated: 2026-06-30 Europe/Kyiv
 - Owner: Local project owner
 - Contributors: Codex
 - Repository path: `C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor`
 - Current branch: `main`
-- Current phase: Post-Phase-8 README/demo verification readiness
+- Current phase: QA hardening and local smoke verification
 - Overall status: green
-- Quality gate status: green; automated gates and local Docker/API/worker/simulator demo verification passed, with human browser/screenshot review still manual pending
+- Quality gate status: green; local gates, Docker reset, API/worker/dashboard HTTP smoke, simulator scenarios, and focused script checks passed with pnpm engine warning documented
 - Completion: 100%
 - Main blocker: none
 
@@ -25,35 +25,36 @@
 
 ## 1. Current objective
 
-- Phase objective: Verify post-Phase-8 README/demo readiness, keep documentation accurate, and fix only documentation-blocking defects needed for the documented local demo commands.
+- Phase objective: Run a QA/hardening pass over local tooling, Node/pnpm engine behavior, Docker reset validation, API/worker/dashboard/simulator smoke checks, and documentation accuracy.
 - Deadline / target date: none
-- Definition of done: STATE records exact verification commands, pass/fail status, skipped checks with reasons, README/demo verification status, and next manual action.
-- Primary user-visible signal: README demo commands are verified through local Docker services, API/worker startup, dashboard HTTP 200, and `pnpm simulator:all`; browser visual inspection remains manual.
-- Secondary checks: package-script cross-check, docs command scan, `git diff --check`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`, Docker Compose status, migration/reset, and `git status --short`.
+- Definition of done: STATE records exact commands, pass/fail/skipped status, Node/pnpm warning diagnosis, local reset note, smoke results, and next manual action.
+- Primary user-visible signal: local API and dashboard routes return HTTP 200, `pnpm simulator:all` completes, and the repo is ready for manual browser screenshot/video capture.
+- Secondary checks: package-script cross-check, docs command scan, `pnpm install`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`, Docker Compose status, migration/reset, focused package scripts, and `git status --short --branch`.
 - Out of scope: GitHub Actions, commits, pushes, tags, deployment, frontend frameworks, provider SDKs, real provider APIs, public tunnels, and paid API usage.
 
 ## 2. Status snapshot
 
-- Summary: README/demo readiness is verified locally after a minimal documentation-blocking env-loader fix; README script accuracy remains green and no README change was needed.
-- Since last update: Requested quality gates passed, Docker/PostgreSQL/Redis/migration/reset passed, API/worker/dashboard HTTP verification passed, and `pnpm simulator:all` completed successfully.
-- Current focus: Human browser review of the dashboard pages, portfolio screenshot/video capture, review, and manual commit when ready.
-- Main uncertainty: Browser visual inspection and screenshot capture remain pending because Codex did not force manual UI review.
+- Summary: QA hardening found the pnpm warning is caused by Codex's bundled pnpm shim using Node `v24.14.0`; project shell Node and `pnpm exec node` use `v24.16.0`. A repo-local dependency fix is not appropriate.
+- Since last update: Added `/health` as a compatibility liveness alias, fixed focused API/worker/queue test scripts that were no-oping, updated docs, reset local demo state, and verified the full simulator flow.
+- Current focus: User review of the QA hardening diff, manual browser review/screenshot capture, and manual commit/push when ready.
+- Main uncertainty: Browser visual inspection and screenshot/video capture remain pending; no screenshots or videos were created in this phase.
 
 ## 3. Completed phases / milestones
 
-| Phase                      | Date       | Summary                                                                                                | Quality gate | Commit / PR |
-| -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------ | ------------ | ----------- |
-| Phase 0 — Foundation       | 2026-06-20 | pnpm workspace scaffold and local infra config.                                                        | green        | none        |
-| Phase 1 — Domain contracts | 2026-06-20 | Core provider contracts, schemas, adapters, retry policy, statuses, and fake/local signature verifier. | green        | none        |
-| Phase 2 — Persistence      | 2026-06-20 | PostgreSQL persistence, Drizzle migrations, db repositories, local reset/seed, and integration tests.  | green        | none        |
-| Phase 3 — Ingress API      | 2026-06-20 | Hono webhook ingress, raw-body signatures, validation, idempotency, audit history, and queue port.     | green        | none        |
-| Phase 4 — Queue / worker   | 2026-06-21 | BullMQ queue, worker processing, retries, delivery attempts, and dead-letter behavior.                 | green        | none        |
-| Phase 4.1 — Verification   | 2026-06-21 | Docs-only manual QA and validation-status clarification for Phase 4 webhook E2E checks.                | green        | none        |
-| Phase 4.2 — QA recording   | 2026-06-21 | Docs-only recording of provided Phase 4 manual webhook E2E QA evidence and skip reasons.               | green        | none        |
-| Phase 5 — Dashboard/replay | 2026-06-21 | Hono dashboard, dashboard JSON endpoints, manual replay audit, replay queue jobs, and worker replay.   | green        | none        |
-| Phase 6 — Simulator/demo   | 2026-06-22 | Repeatable local simulator commands, failure scenario docs, queue reset, and replay demo behavior.     | green        | none        |
-| Phase 7 — Reliability      | 2026-06-22 | Config validation, correlation IDs, safe errors, readiness, rate/body limits, redaction, and shutdown. | green        | none        |
-| Phase 8 — Documentation    | 2026-06-22 | Portfolio README/docs polish, demo script, screenshot checklist, troubleshooting, and STATE repair.    | green        | none        |
+| Phase                      | Date       | Summary                                                                                                                     | Quality gate | Commit / PR |
+| -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- |
+| Phase 0 — Foundation       | 2026-06-20 | pnpm workspace scaffold and local infra config.                                                                             | green        | none        |
+| Phase 1 — Domain contracts | 2026-06-20 | Core provider contracts, schemas, adapters, retry policy, statuses, and fake/local signature verifier.                      | green        | none        |
+| Phase 2 — Persistence      | 2026-06-20 | PostgreSQL persistence, Drizzle migrations, db repositories, local reset/seed, and integration tests.                       | green        | none        |
+| Phase 3 — Ingress API      | 2026-06-20 | Hono webhook ingress, raw-body signatures, validation, idempotency, audit history, and queue port.                          | green        | none        |
+| Phase 4 — Queue / worker   | 2026-06-21 | BullMQ queue, worker processing, retries, delivery attempts, and dead-letter behavior.                                      | green        | none        |
+| Phase 4.1 — Verification   | 2026-06-21 | Docs-only manual QA and validation-status clarification for Phase 4 webhook E2E checks.                                     | green        | none        |
+| Phase 4.2 — QA recording   | 2026-06-21 | Docs-only recording of provided Phase 4 manual webhook E2E QA evidence and skip reasons.                                    | green        | none        |
+| Phase 5 — Dashboard/replay | 2026-06-21 | Hono dashboard, dashboard JSON endpoints, manual replay audit, replay queue jobs, and worker replay.                        | green        | none        |
+| Phase 6 — Simulator/demo   | 2026-06-22 | Repeatable local simulator commands, failure scenario docs, queue reset, and replay demo behavior.                          | green        | none        |
+| Phase 7 — Reliability      | 2026-06-22 | Config validation, correlation IDs, safe errors, readiness, rate/body limits, redaction, and shutdown.                      | green        | none        |
+| Phase 8 — Documentation    | 2026-06-22 | Portfolio README/docs polish, demo script, screenshot checklist, troubleshooting, and STATE repair.                         | green        | none        |
+| QA hardening               | 2026-06-30 | Node/pnpm warning diagnosis, local reset gate, `/health` alias, focused script fixes, docs cleanup, and smoke verification. | green        | none        |
 
 ## 4. Completed since last update
 
@@ -86,6 +87,11 @@
 - 2026-06-22: Found and fixed a documentation-blocking env-loader root path bug — evidence: `pnpm dev:api` initially failed after `Copy-Item .env.example .env` because `apps/api/src/config.ts` and `apps/worker/src/config.ts` resolved the repo root one directory too high; both now resolve the repository root directly.
 - 2026-06-22: Completed post-fix automated validation — evidence: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, and `pnpm test -- --run` passed; Vitest reported 29 test files and 154 tests passed.
 - 2026-06-22: Completed local README/demo runtime verification without real provider or paid APIs — evidence: `docker compose -f .\infra\docker-compose.yml up -d postgres redis`, `docker compose -f .\infra\docker-compose.yml ps`, `pnpm db:migrate`, `pnpm demo:reset`, `Copy-Item .env.example .env`, API `/healthz` and `/readyz`, dashboard HTTP `200`, worker startup, and `pnpm simulator:all` passed; browser visual inspection remains manual pending.
+- 2026-06-30: Completed QA hardening audit — evidence: branch/worktree clean at start on `main`, package/docs/Compose/scripts inspected, and root `package.json` confirmed there is no root `build` script.
+- 2026-06-30: Diagnosed pnpm engine warning — evidence: shell `node --version` and `pnpm exec node --version` returned `v24.16.0`, but selected `pnpm.cmd` launches Codex bundled Node `v24.14.0`; `pnpm install` reproduced the warning with exit code 0.
+- 2026-06-30: Added `/health` liveness alias beside `/healthz` after the requested smoke target returned 404; added API test coverage and verified `/health`, `/healthz`, `/readyz`, `/dashboard`, `/dashboard/events`, and `/dashboard/dead-letter` all returned HTTP 200.
+- 2026-06-30: Fixed focused package test scripts that previously exited 0 with no test files — evidence: `pnpm api:test` now runs 3 files/35 tests, `pnpm worker:test` runs 4 files/20 tests, and `pnpm queue:test` runs 4 files/11 tests.
+- 2026-06-30: Completed Docker reset and simulator smoke — evidence: `pnpm docker:up`, `pnpm docker:ps`, `pnpm db:migrate`, `pnpm demo:reset`, `pnpm test -- --run`, live API/worker smoke, unsupported-provider POST, dashboard summary check, and `pnpm simulator:all` passed.
 
 ## 5. Changed files
 
@@ -133,10 +139,49 @@
 | `README.md`, `.env.example`, `docs/*.md`, `STATE.md`                                              | Phase 8 portfolio docs/ledger        | updated | Docs-only polish and completion repair; no app behavior, dependencies, scripts, CI, or real API usage.                   |
 | `apps/api/src/config.ts`, `apps/worker/src/config.ts`                                             | Local env loader fix                 | updated | Fixes repo-root resolution so documented `.env` / `.env.example` local demo loading works for API and worker commands.   |
 | `STATE.md`                                                                                        | README/demo readiness ledger         | updated | Records exact post-Phase-8 verification commands, pass/fail status, skipped checks, and remaining manual browser review. |
+| `apps/api/src/routes/health.ts`, `apps/api/test/webhooks.test.ts`                                 | Health route compatibility           | updated | Adds and tests `GET /health` as a liveness alias beside `GET /healthz`.                                                  |
+| `apps/api/package.json`, `apps/worker/package.json`, `packages/queue/package.json`                | Focused test scripts                 | updated | Fixes package-level Vitest roots so focused scripts discover their tests.                                                |
+| `README.md`, `RUNBOOK.md`, `TDD.md`, `CONTEXT.md`, `STATE.md`                                     | QA hardening documentation           | updated | Records exact local commands, warning diagnosis, runtime smoke flow, current risks, and command placeholders.            |
 
 ## 6. Validation and quality gates
 
 ### Required gates
+
+### 2026-06-30 QA hardening and smoke verification
+
+| Gate / check               | Command / evidence                                                                                | Status                    | Evidence / notes                                                                                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| initial git status         | `git status --short --branch`                                                                     | pass                      | `## main...origin/main`; clean before edits.                                                                                                                                              |
+| repository audit           | `rg --files`; read root/workspace package manifests, docs, and `infra/docker-compose.yml`         | pass                      | Workspace has API, worker, core, db, queue, simulator, local docs, and Docker Compose Postgres/Redis.                                                                                     |
+| script audit               | root and workspace `package.json` files                                                           | pass                      | No root `build` script exists; `pnpm typecheck` remains the build-equivalent gate.                                                                                                        |
+| Node direct version        | `node --version`; `node -p "process.execPath"`                                                    | pass                      | `v24.16.0` from `C:\Program Files\nodejs\node.exe`.                                                                                                                                       |
+| pnpm version               | `pnpm --version`; `pnpm config list`                                                              | pass with warning finding | pnpm `11.7.0`; selected shim user agent reports Node `v24.14.0`.                                                                                                                          |
+| pnpm Node version          | `pnpm exec node --version`; `pnpm exec node -p "process.execPath"`                                | pass                      | `v24.16.0` from `C:\Program Files\nodejs\node.exe`.                                                                                                                                       |
+| pnpm shim diagnosis        | `Get-Command pnpm`; read selected `pnpm.cmd`; bundled node `--version`                            | finding                   | Codex shim at `.cache\codex-runtimes\...\pnpm.cmd` launches bundled Node `v24.14.0`; not safe to fix inside this repo.                                                                    |
+| install                    | `pnpm install`                                                                                    | pass with warning         | Reproduced unsupported-engine warning; lockfile already up to date; no dependencies changed.                                                                                              |
+| initial format             | `pnpm format:check`                                                                               | pass                      | Passed before docs edits; later docs edits required targeted Prettier.                                                                                                                    |
+| lint                       | `pnpm lint`                                                                                       | pass                      | ESLint completed with exit code 0.                                                                                                                                                        |
+| typecheck                  | `pnpm typecheck`                                                                                  | pass                      | TypeScript build mode completed with exit code 0.                                                                                                                                         |
+| Docker start               | `pnpm docker:up`                                                                                  | pass                      | Local Postgres/Redis containers started.                                                                                                                                                  |
+| Docker status              | `pnpm docker:ps`                                                                                  | pass                      | `webhook-monitor-postgres` and `webhook-monitor-redis` were `Up` and `healthy`.                                                                                                           |
+| migration                  | `pnpm db:migrate`                                                                                 | pass                      | Existing Drizzle schema/table notices only; migrations applied.                                                                                                                           |
+| local reset                | `pnpm demo:reset`                                                                                 | pass                      | Authorized local-only reset cleared application DB tables and BullMQ queue state.                                                                                                         |
+| tests before hardening fix | `pnpm test -- --run`                                                                              | pass                      | Vitest reported 29 files and 154 tests passed.                                                                                                                                            |
+| initial HTTP smoke         | local `Invoke-WebRequest` route check                                                             | fail, fixed               | `/health` returned 404; `/healthz`, `/readyz`, dashboard routes returned 200.                                                                                                             |
+| health alias fix           | `/health` route and `webhooks.test.ts` coverage                                                   | pass                      | Added `GET /health` alias with same minimal liveness response as `/healthz`.                                                                                                              |
+| HTTP smoke after fix       | `GET /health`, `/healthz`, `/readyz`, `/dashboard`, `/dashboard/events`, `/dashboard/dead-letter` | pass                      | All returned HTTP 200 after API restart.                                                                                                                                                  |
+| simulator                  | `pnpm simulator:all`                                                                              | pass                      | Covered valid Stripe-style event, generic success, duplicate/idempotency, invalid signature, invalid payload, mock CRM, retry success, dead-letter, permanent failure, and manual replay. |
+| unsupported provider       | `POST /webhooks/unsupported-provider`                                                             | pass                      | Returned HTTP 404 with `unsupported_provider`.                                                                                                                                            |
+| dashboard summary          | `GET /api/dashboard/summary`                                                                      | pass                      | After simulator: event volume 10, success rate 0.75, retry count 6, dead-letter count 3.                                                                                                  |
+| smoke process cleanup      | `taskkill.exe` only for started API/worker process trees; port check                              | pass                      | API/worker smoke processes were stopped; no listener remained on port `3000`.                                                                                                             |
+| focused API tests          | `pnpm api:test`                                                                                   | pass                      | After script fix: 3 files and 35 tests passed.                                                                                                                                            |
+| focused worker tests       | `pnpm worker:test`                                                                                | pass                      | After script fix: 4 files and 20 tests passed.                                                                                                                                            |
+| focused queue tests        | `pnpm queue:test`                                                                                 | pass                      | After script fix: 4 files and 11 tests passed.                                                                                                                                            |
+| docs formatting            | `pnpm format:check`; `pnpm exec prettier --write .\CONTEXT.md .\RUNBOOK.md .\TDD.md .\README.md`  | pass after fix            | Initial docs check failed on edited docs; targeted Prettier fixed them.                                                                                                                   |
+| final local gates          | `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test -- --run`                          | pass                      | Final root pass completed; Vitest reported 29 files and 155 tests passed.                                                                                                                 |
+| browser review             | Manual browser inspection/screenshot capture                                                      | skipped                   | Not automated in this phase; use dashboard checklist for portfolio capture.                                                                                                               |
+| GitHub Actions / CI        | n/a                                                                                               | skipped                   | Explicitly out of scope.                                                                                                                                                                  |
+| real provider / paid APIs  | n/a                                                                                               | skipped                   | Explicitly out of scope; all verification stayed fake/local.                                                                                                                              |
 
 ### Post-Phase-8 README/demo verification readiness
 
@@ -431,23 +476,24 @@
 
 ## 7. Active tasks
 
-| ID       | Priority | Task                                                          | Owner | Status | ETA  | Notes                                                                  |
-| -------- | -------- | ------------------------------------------------------------- | ----- | ------ | ---- | ---------------------------------------------------------------------- |
-| TASK-001 | P1       | Perform human browser dashboard review and portfolio capture. | User  | todo   | none | API/worker simulator path already passed locally; inspect UI visually. |
-| TASK-002 | P2       | Review post-Phase-8 readiness diff.                           | User  | todo   | none | Includes minimal env-loader fix plus `STATE.md` ledger update.         |
-| TASK-003 | P2       | Commit and push manually when ready.                          | User  | todo   | none | Codex must not commit or push.                                         |
+| ID       | Priority | Task                                                          | Owner | Status | ETA  | Notes                                                                              |
+| -------- | -------- | ------------------------------------------------------------- | ----- | ------ | ---- | ---------------------------------------------------------------------------------- |
+| TASK-001 | P1       | Perform human browser dashboard review and portfolio capture. | User  | todo   | none | API/worker simulator path passed locally; screenshots/video not captured by Codex. |
+| TASK-002 | P2       | Review QA hardening diff.                                     | User  | todo   | none | Includes `/health` alias, focused script fixes, and docs/state updates.            |
+| TASK-003 | P2       | Commit and push manually when ready.                          | User  | todo   | none | Codex must not commit or push.                                                     |
 
 ## 8. Backlog / long horizon
 
-| Priority    | Item   | Impact       | Effort       | Status                              | Notes   |
-| ----------- | ------ | ------------ | ------------ | ----------------------------------- | ------- |
-| P0/P1/P2/P3 | <item> | low/med/high | low/med/high | proposed/accepted/deferred/rejected | <notes> |
+| Priority | Item                                                   | Impact | Effort | Status   | Notes                                     |
+| -------- | ------------------------------------------------------ | ------ | ------ | -------- | ----------------------------------------- |
+| P2       | Add automated browser screenshot/a11y smoke if desired | medium | medium | proposed | Current portfolio capture remains manual. |
+| P2       | Add CI only after explicit approval                    | medium | medium | deferred | Local validation remains default.         |
 
 ## 9. Known issues
 
-| ID        | Issue                                                       | Severity | Owner / layer | Next action                                          | Target |
-| --------- | ----------------------------------------------------------- | -------- | ------------- | ---------------------------------------------------- | ------ |
-| ISSUE-001 | No known README/demo runtime blockers after env-loader fix. | low      | n/a           | Complete human browser review and portfolio capture. | none   |
+| ID        | Issue                                                                                | Severity | Owner / layer | Next action                                                                                      | Target |
+| --------- | ------------------------------------------------------------------------------------ | -------- | ------------- | ------------------------------------------------------------------------------------------------ | ------ |
+| ISSUE-001 | pnpm engine warning appears in Codex because bundled pnpm shim uses Node `v24.14.0`. | low      | local tooling | Use system/Corepack pnpm in manual PowerShell or update Codex runtime; do not lower repo engine. | none   |
 
 ## 10. Risks
 
@@ -455,41 +501,45 @@
 | -------- | ----------------------------------------------- | ----------- | ------ | ------------------------------------------------------ | ---------- | ---------------------------- |
 | RISK-001 | Future local port conflict on `5432` or `6379`. | low         | medium | Do not kill processes; report conflict if seen.        | User       | Compose start failure        |
 | RISK-002 | Future local port conflict on API port `3000`.  | low         | low    | Report conflict; use an explicit `API_PORT` if needed. | User/Codex | `pnpm dev:api` start failure |
+| RISK-003 | Dashboard is unauthenticated local-demo UI.     | medium      | high   | Keep local only; add auth/CSRF before any deployment.  | User       | Any public exposure request  |
 
 ## 11. Decisions since last update
 
-| ID      | Date       | Decision                                                               | Rationale                                                                                                                      | Tradeoff / consequence                                                                                                 |
-| ------- | ---------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| DEC-001 | 2026-06-20 | Use pnpm workspace with local-only tooling.                            | Matches requested stack and phase gating.                                                                                      | Runtime dependencies deferred to later phases.                                                                         |
-| DEC-002 | 2026-06-20 | Use Docker Compose for PostgreSQL and Redis.                           | Matches future architecture requirements.                                                                                      | Validation requires Docker Desktop to be running.                                                                      |
-| DEC-003 | 2026-06-20 | Keep real provider APIs disabled by default.                           | Prevents paid/credentialed API use locally.                                                                                    | Later phases must use mocks unless approved.                                                                           |
-| DEC-004 | 2026-06-20 | Use Hono for Phase 3 ingress.                                          | Matches requested stack and keeps tests serverless via `app.request()`.                                                        | Dashboard/UI remains deferred.                                                                                         |
-| DEC-005 | 2026-06-20 | Keep queue as a placeholder port only.                                 | Preserves Phase 3 boundary and prepares Phase 4 replacement.                                                                   | No Redis/BullMQ behavior yet.                                                                                          |
-| DEC-006 | 2026-06-21 | Use BullMQ with stable job IDs and capped custom backoff for Phase 4.  | Matches requested queue/worker stack and keeps retry policy configurable from local env.                                       | BullMQ rejects `:` in custom IDs, so job IDs use `delivery-<eventId>`.                                                 |
-| DEC-007 | 2026-06-21 | Keep downstream delivery payload-driven and local-only.                | Demonstrates success, retry, permanent failure, and dead-letter behavior without external APIs.                                | Real provider delivery remains deferred.                                                                               |
-| DEC-008 | 2026-06-21 | Keep Phase 5 dashboard server-rendered and local-demo unauthenticated. | Matches phase constraints and avoids frontend framework/auth scope creep.                                                      | Do not expose the dashboard publicly without later auth hardening.                                                     |
-| DEC-009 | 2026-06-22 | Build the simulator as a local TypeScript CLI under `tools/simulator`. | Reuses current pnpm/tsx/Vitest tooling and avoids provider SDKs or paid APIs.                                                  | Full scenario smoke requires local API, worker, PostgreSQL, and Redis.                                                 |
-| DEC-010 | 2026-06-22 | Make `demo:reset` clear DB tables and the local BullMQ queue.          | Repeatable demos need clean persistence and queue state.                                                                       | Reset remains local-only and refuses non-local targets.                                                                |
-| DEC-011 | 2026-06-22 | Treat exact `.env.example` values as the local runtime contract.       | README/demo verification now confirms API and worker load `.env` / `.env.example` from the repo root after the env-loader fix. | Copy `.env.example` to `.env` for the documented clean workflow, and restart long-running processes after env changes. |
+| ID      | Date       | Decision                                                                                                  | Rationale                                                                                                                      | Tradeoff / consequence                                                                                                 |
+| ------- | ---------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| DEC-001 | 2026-06-20 | Use pnpm workspace with local-only tooling.                                                               | Matches requested stack and phase gating.                                                                                      | Runtime dependencies deferred to later phases.                                                                         |
+| DEC-002 | 2026-06-20 | Use Docker Compose for PostgreSQL and Redis.                                                              | Matches future architecture requirements.                                                                                      | Validation requires Docker Desktop to be running.                                                                      |
+| DEC-003 | 2026-06-20 | Keep real provider APIs disabled by default.                                                              | Prevents paid/credentialed API use locally.                                                                                    | Later phases must use mocks unless approved.                                                                           |
+| DEC-004 | 2026-06-20 | Use Hono for Phase 3 ingress.                                                                             | Matches requested stack and keeps tests serverless via `app.request()`.                                                        | Dashboard/UI remains deferred.                                                                                         |
+| DEC-005 | 2026-06-20 | Keep queue as a placeholder port only.                                                                    | Preserves Phase 3 boundary and prepares Phase 4 replacement.                                                                   | No Redis/BullMQ behavior yet.                                                                                          |
+| DEC-006 | 2026-06-21 | Use BullMQ with stable job IDs and capped custom backoff for Phase 4.                                     | Matches requested queue/worker stack and keeps retry policy configurable from local env.                                       | BullMQ rejects `:` in custom IDs, so job IDs use `delivery-<eventId>`.                                                 |
+| DEC-007 | 2026-06-21 | Keep downstream delivery payload-driven and local-only.                                                   | Demonstrates success, retry, permanent failure, and dead-letter behavior without external APIs.                                | Real provider delivery remains deferred.                                                                               |
+| DEC-008 | 2026-06-21 | Keep Phase 5 dashboard server-rendered and local-demo unauthenticated.                                    | Matches phase constraints and avoids frontend framework/auth scope creep.                                                      | Do not expose the dashboard publicly without later auth hardening.                                                     |
+| DEC-009 | 2026-06-22 | Build the simulator as a local TypeScript CLI under `tools/simulator`.                                    | Reuses current pnpm/tsx/Vitest tooling and avoids provider SDKs or paid APIs.                                                  | Full scenario smoke requires local API, worker, PostgreSQL, and Redis.                                                 |
+| DEC-010 | 2026-06-22 | Make `demo:reset` clear DB tables and the local BullMQ queue.                                             | Repeatable demos need clean persistence and queue state.                                                                       | Reset remains local-only and refuses non-local targets.                                                                |
+| DEC-011 | 2026-06-22 | Treat exact `.env.example` values as the local runtime contract.                                          | README/demo verification now confirms API and worker load `.env` / `.env.example` from the repo root after the env-loader fix. | Copy `.env.example` to `.env` for the documented clean workflow, and restart long-running processes after env changes. |
+| DEC-012 | 2026-06-30 | Keep project Node engine at `>=24.16.0` and document Codex pnpm shim warning instead of lowering engines. | Shell Node and `pnpm exec node` satisfy the engine; only the selected Codex pnpm shim runs under bundled Node `v24.14.0`.      | Manual remediation is environment-level: use system/Corepack pnpm or update Codex runtime.                             |
+| DEC-013 | 2026-06-30 | Add `/health` as an alias beside `/healthz`.                                                              | The requested smoke target was `/health`; adding an additive alias is safer than breaking existing `/healthz` docs/tests.      | Both liveness routes must remain covered by tests.                                                                     |
 
 ## 12. Open questions
 
-| ID    | Question                                       | Owner | Needed by | Current best answer / assumption                               |
-| ----- | ---------------------------------------------- | ----- | --------- | -------------------------------------------------------------- |
-| Q-001 | Are local Docker ports `5432` and `6379` free? | User  | Phase 0   | Answered on 2026-06-20: both were available during validation. |
+| ID    | Question                                                                             | Owner | Needed by         | Current best answer / assumption                               |
+| ----- | ------------------------------------------------------------------------------------ | ----- | ----------------- | -------------------------------------------------------------- |
+| Q-001 | Are local Docker ports `5432` and `6379` free?                                       | User  | Phase 0           | Answered on 2026-06-20: both were available during validation. |
+| Q-002 | Should browser screenshots/video be captured manually or automated in a later phase? | User  | Portfolio capture | Open; no screenshots/video were created in this QA phase.      |
 
 ## 13. Next 3 actions
 
-1. User: Start `pnpm dev:api` and `pnpm dev:worker`, open dashboard pages in a browser, and capture portfolio screenshots/video.
-2. User: Review the post-Phase-8 readiness diff — expected result: env-loader fix and STATE wording match the intended completion record.
+1. User: Review the QA hardening diff — expected result: `/health` alias, focused scripts, and docs updates match intended local-demo scope.
+2. User: Start `pnpm dev:api` and `pnpm dev:worker`, open dashboard pages in a browser, and capture portfolio screenshots/video.
 3. User: Commit and push manually when ready — expected result: readiness closure captured in Git history without Codex touching remotes.
 
 ## 14. Handoff notes
 
-- Start here next: `TASK-001`
+- Start here next: `TASK-002`
 - Read first: `README.md`, `docs/reliability-hardening.md`, `docs/manual-verification-checklist.md`, `docs/demo-script.md`, and `STATE.md`
 - Commands to run first for manual portfolio capture from the current verified data: start `pnpm dev:api` and `pnpm dev:worker` in separate PowerShell terminals, then open `http://localhost:3000/dashboard`, `/dashboard/events`, and `/dashboard/dead-letter`.
 - Commands to rerun a clean full demo: `Copy-Item .env.example .env` if `.env` is absent; `docker compose -f .\infra\docker-compose.yml up -d postgres redis`; `pnpm db:migrate`; `pnpm demo:reset`; start `pnpm dev:api` and `pnpm dev:worker`; then run `pnpm simulator:all`.
 - Do not change: Git remotes, commit history, real provider credentials, paid API integrations, or application behavior outside the approved phase.
-- Watch for: next-phase scope creep, env drift from `.env.example`, and any request that would introduce real provider credentials, paid API usage, provider SDKs, or deployment automation before those are approved.
+- Watch for: Codex pnpm shim engine warnings, next-phase scope creep, env drift from `.env.example`, and any request that would introduce real provider credentials, paid API usage, provider SDKs, or deployment automation before those are approved.
 - Suggested next prompt: `Review the dashboard in a browser and capture portfolio screenshots.`

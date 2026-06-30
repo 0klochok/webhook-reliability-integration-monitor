@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/server.ts",
-    "test": "vitest run test",
+    "test": "vitest run --root ../.. apps/api/test",
     "typecheck": "tsc -b ../../tsconfig.json --pretty false"
   },
   "dependencies": {

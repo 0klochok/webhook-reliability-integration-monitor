@@ -43,26 +43,26 @@ Use this document for:
 
 ## 4. Test environments
 
-| Environment       | Purpose                                | Data policy                       | Command / URL       | Notes                                          |
-| ----------------- | -------------------------------------- | --------------------------------- | ------------------- | ---------------------------------------------- |
-| Local             | Fast development feedback              | Synthetic or sanitized only       | `<command>`         | Must run targeted tests before commit.         |
-| CI                | Mandatory quality gate                 | Synthetic or sanitized only       | `<command>`         | Must be deterministic and non-interactive.     |
-| Preview / staging | Integrated validation and smoke checks | Non-production or sanitized only  | `<command/url>`     | Use seeded data where possible.                |
-| Production smoke  | Post-release verification only         | Read-only or explicitly safe data | `<command/runbook>` | Must not mutate customer data unless approved. |
+| Environment       | Purpose                                | Data policy                       | Command / URL        | Notes                                                |
+| ----------------- | -------------------------------------- | --------------------------------- | -------------------- | ---------------------------------------------------- |
+| Local             | Fast development feedback              | Synthetic or sanitized only       | `pnpm test -- --run` | Must run targeted or full local tests before commit. |
+| CI                | Mandatory quality gate                 | Synthetic or sanitized only       | not configured       | Add only in a later approved phase.                  |
+| Preview / staging | Integrated validation and smoke checks | Non-production or sanitized only  | not configured       | This project is local portfolio/demo only.           |
+| Production smoke  | Post-release verification only         | Read-only or explicitly safe data | not configured       | No production deployment exists.                     |
 
 ## 5. Test layers
 
-| Layer               | Required when                                                                            | Examples                                                 | Tool / location | Command     | Required for done? |
-| ------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------- | ----------- | ------------------ |
-| Unit                | Core logic, validation, transformations, state machines, utilities, business rules       | Pure functions, domain services, validators              | `<tool/path>`   | `<command>` | yes/no             |
-| Integration         | Persistence, adapters, API handlers, queues, file systems, service boundaries            | Repository tests, API + DB tests, adapter tests          | `<tool/path>`   | `<command>` | yes/no             |
-| Contract            | Public APIs, schemas, events, third-party integrations, provider/consumer boundaries     | OpenAPI/schema tests, event payload compatibility        | `<tool/path>`   | `<command>` | yes/no             |
-| E2E                 | Critical UI or system flows where unit/integration tests cannot prove behavior           | Sign-up, checkout, import/export, core workflows         | `<tool/path>`   | `<command>` | yes/no             |
-| Smoke               | Runnable app, service, worker, CLI, or release candidate exists                          | App boots, health endpoint, CLI help, basic workflow     | `<tool/path>`   | `<command>` | yes/no             |
-| Security / safety   | Secrets, auth, permissions, risky actions, external integrations, destructive operations | Access control, unsafe input, secret leakage, guardrails | `<tool/path>`   | `<command>` | yes/no             |
-| Visual regression   | UI layout or design-critical screens exist                                               | Screenshots, component snapshots, responsive states      | `<tool/path>`   | `<command>` | yes/no             |
-| Performance smoke   | Latency, throughput, memory, startup time, or scale-sensitive code exists                | Baseline request time, job duration, render time         | `<tool/path>`   | `<command>` | yes/no             |
-| Accessibility smoke | User-facing UI exists                                                                    | Keyboard flow, labels, contrast, semantic structure      | `<tool/path>`   | `<command>` | yes/no             |
+| Layer               | Required when                                                                            | Examples                                                 | Tool / location                                                                | Command                                                                      | Required for done?          |
+| ------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | --------------------------- |
+| Unit                | Core logic, validation, transformations, state machines, utilities, business rules       | Pure functions, domain services, validators              | `packages/core/test`, `tools/simulator/test`                                   | `pnpm test -- --run`                                                         | yes                         |
+| Integration         | Persistence, adapters, API handlers, queues, file systems, service boundaries            | Repository tests, API + DB tests, adapter tests          | `apps/api/test`, `apps/worker/test`, `packages/db/test`, `packages/queue/test` | `pnpm test -- --run`                                                         | yes                         |
+| Contract            | Public APIs, schemas, events, third-party integrations, provider/consumer boundaries     | Provider payload compatibility and job contracts         | `packages/core/src/schemas`, `packages/queue/src/delivery-job.ts`              | `pnpm test -- --run`                                                         | yes                         |
+| E2E                 | Critical UI or system flows where unit/integration tests cannot prove behavior           | Local webhook intake through worker/dashboard            | `tools/simulator/src/scenarios`, `docs/manual-verification-checklist.md`       | `pnpm simulator:all` after local services are running                        | yes for demo/runtime phases |
+| Smoke               | Runnable app, service, worker, CLI, or release candidate exists                          | App boots, health endpoint, CLI help, basic workflow     | API, worker, Docker Compose, simulator                                         | `pnpm docker:up`, `pnpm docker:ps`, API/worker startup, `pnpm simulator:all` | yes for runtime phases      |
+| Security / safety   | Secrets, auth, permissions, risky actions, external integrations, destructive operations | Access control, unsafe input, secret leakage, guardrails | `.env.example`, redaction/error tests, docs review                             | `pnpm test -- --run`, `git diff --check`, manual diff review                 | yes                         |
+| Visual regression   | UI layout or design-critical screens exist                                               | Screenshots, responsive states                           | `docs/screenshot-checklist.md`                                                 | Manual browser review                                                        | no automated gate yet       |
+| Performance smoke   | Latency, throughput, memory, startup time, or scale-sensitive code exists                | Baseline request time, job duration, render time         | n/a                                                                            | not configured                                                               | no                          |
+| Accessibility smoke | User-facing UI exists                                                                    | Keyboard flow, labels, contrast, semantic structure      | dashboard pages                                                                | Manual browser review                                                        | no automated gate yet       |
 
 ## 6. Red-green-refactor workflow
 
@@ -126,28 +126,28 @@ Use this section for each non-trivial feature, bug fix, or behavior-changing ref
 
 ### Required gates
 
-| Gate                    | Command            | Required when                                                        | Pass criteria                              | Required for phase done? |
-| ----------------------- | ------------------ | -------------------------------------------------------------------- | ------------------------------------------ | ------------------------ |
-| Format                  | `<command>`        | Code or docs are changed                                             | No formatting diff remains                 | yes/no                   |
-| Lint                    | `<command>`        | Code is changed                                                      | No lint errors                             | yes/no                   |
-| Typecheck               | `<command>`        | Typed code is changed                                                | No type errors                             | yes/no                   |
-| Unit tests              | `<command>`        | Any logic is changed                                                 | All relevant tests pass                    | yes/no                   |
-| Integration tests       | `<command>`        | Adapters, API, persistence, queues, files, or services are changed   | All relevant tests pass                    | yes/no                   |
-| Contract tests          | `<command>`        | Schemas, public APIs, events, or provider/consumer boundaries change | Contracts are compatible or versioned      | yes/no                   |
-| Build                   | `<command>`        | Buildable artifact exists                                            | Build succeeds                             | yes/no                   |
-| Smoke                   | `<command>`        | Runnable app/service/worker/CLI exists                               | Basic runtime path succeeds                | yes/no                   |
-| Forbidden / secret scan | `<command>`        | Any code, config, or docs change                                     | No committed secrets or forbidden patterns | yes/no                   |
-| Docs / state check      | `<command/manual>` | Behavior, workflow, command, policy, or status changes               | Relevant docs and `STATE.md` are current   | yes/no                   |
+| Gate                    | Command                                                                                                            | Required when                                                        | Pass criteria                              | Required for phase done? |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------ | ------------------------ |
+| Format                  | `pnpm format:check`                                                                                                | Code or docs are changed                                             | No formatting diff remains                 | yes                      |
+| Lint                    | `pnpm lint`                                                                                                        | Code is changed                                                      | No lint errors                             | yes                      |
+| Typecheck               | `pnpm typecheck`                                                                                                   | Typed code is changed                                                | No type errors                             | yes                      |
+| Unit tests              | `pnpm test -- --run`                                                                                               | Any logic is changed                                                 | All relevant tests pass                    | yes                      |
+| Integration tests       | `pnpm test -- --run`                                                                                               | Adapters, API, persistence, queues, files, or services are changed   | All relevant tests pass                    | yes                      |
+| Contract tests          | `pnpm test -- --run`                                                                                               | Schemas, public APIs, events, or provider/consumer boundaries change | Contracts are compatible or versioned      | yes                      |
+| Build                   | `pnpm typecheck`                                                                                                   | Typed code changes; no root `build` script exists                    | TypeScript build mode succeeds             | yes                      |
+| Smoke                   | `pnpm docker:up`, `pnpm docker:ps`, `pnpm db:migrate`, `pnpm demo:reset`, API/worker startup, `pnpm simulator:all` | Runnable app/service/worker/CLI exists                               | Basic runtime path succeeds                | yes for runtime phases   |
+| Forbidden / secret scan | `git diff --check` plus manual diff review                                                                         | Any code, config, or docs change                                     | No committed secrets or forbidden patterns | yes                      |
+| Docs / state check      | Manual review                                                                                                      | Behavior, workflow, command, policy, or status changes               | Relevant docs and `STATE.md` are current   | yes                      |
 
 ### Optional gates
 
-| Gate                | Command     | Required when promoted to mandatory                      | Notes                                               |
-| ------------------- | ----------- | -------------------------------------------------------- | --------------------------------------------------- |
-| E2E                 | `<command>` | Critical flow cannot be sufficiently covered below E2E   | Keep minimal and stable.                            |
-| Visual regression   | `<command>` | Visual layout is user-critical                           | Prefer stable fixtures and deterministic rendering. |
-| Performance smoke   | `<command>` | Latency, memory, throughput, or startup time is material | Track baseline and threshold.                       |
-| Accessibility smoke | `<command>` | User-facing UI changes                                   | Include keyboard and semantic checks.               |
-| Dependency audit    | `<command>` | Dependencies change or release is prepared               | Record accepted risk.                               |
+| Gate                | Command                                  | Required when promoted to mandatory                      | Notes                                                 |
+| ------------------- | ---------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------- |
+| E2E                 | `pnpm simulator:all`                     | Critical flow cannot be sufficiently covered below E2E   | Requires Docker services, API, and worker.            |
+| Visual regression   | Manual browser/screenshot checklist      | Visual layout is user-critical                           | No automated visual regression is configured.         |
+| Performance smoke   | not configured                           | Latency, memory, throughput, or startup time is material | Track baseline and threshold before making mandatory. |
+| Accessibility smoke | Manual dashboard keyboard/semantic check | User-facing UI changes                                   | Include keyboard and semantic checks.                 |
+| Dependency audit    | `pnpm install`, manifest/lockfile review | Dependencies change or release is prepared               | No dependency audit gate is currently configured.     |
 
 ### Skipped gate record
 

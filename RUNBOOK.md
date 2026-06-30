@@ -2,7 +2,7 @@
 
 ## Meta
 
-- Last updated: 2026-06-20
+- Last updated: 2026-06-30
 - Owner: Local project owner
 - Status: active
 - Project: webhook-reliability-integration-monitor
@@ -15,9 +15,10 @@
 - Primary users: Developers and operators evaluating webhook reliability patterns.
 - Stack:
   - Runtime: Node.js + TypeScript
-  - Backend: Hono planned later; not implemented in Phase 0
-  - Frontend: server-rendered dashboard planned later; not implemented in Phase 0
-  - Database: PostgreSQL planned; local Docker service configured in Phase 0
+  - Backend: Hono API for webhook intake, health/readiness, and dashboard routes
+  - Frontend: local server-rendered Hono dashboard
+  - Database: PostgreSQL through Drizzle
+  - Queue/worker: BullMQ worker backed by Redis
   - Infrastructure/services: Docker Compose with PostgreSQL and Redis
 - Repository path:
 
@@ -26,11 +27,9 @@ Set-Location -LiteralPath "C:\Users\alex\Documents\Coding Projects\Portfolio Pro
 ```
 
 - Main entry points:
-  - Backend: `apps/api` planned; package manifest only in Phase 0
-  - Worker: `apps/worker` planned; package manifest only in Phase 0
-  - Simulator: `tools/simulator` planned; package manifest only in Phase 0
-
-> Keep this file operational. Replace placeholders with project-specific commands and delete sections that do not apply.
+  - Backend: `apps/api`
+  - Worker: `apps/worker`
+  - Simulator: `tools/simulator`
 
 ## 2. Operating rules
 
@@ -76,15 +75,17 @@ pnpm install
 3. Never commit `.env` or real secrets.
 4. Keep `.env.example` current with placeholder values only.
 
-| Variable                     | Required | Description                                          | Example placeholder                                                                    |
-| ---------------------------- | -------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `DATABASE_URL`               | yes      | Local PostgreSQL connection string for future phases | `postgresql://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor` |
-| `POSTGRES_USER`              | yes      | Local PostgreSQL username                            | `webhook_monitor`                                                                      |
-| `POSTGRES_PASSWORD`          | yes      | Local PostgreSQL password                            | `webhook_monitor_password`                                                             |
-| `POSTGRES_DB`                | yes      | Local PostgreSQL database                            | `webhook_monitor`                                                                      |
-| `REDIS_URL`                  | yes      | Local Redis connection string for future phases      | `redis://localhost:6379`                                                               |
-| `REAL_PROVIDER_APIS_ENABLED` | yes      | Guardrail for real provider API usage                | `false`                                                                                |
-| `WEBHOOK_SIGNING_SECRET`     | yes      | Fake local sample signing secret for future tests    | `whsec_local_fake_secret_do_not_use`                                                   |
+| Variable                       | Required | Description                                   | Example placeholder                                                                  |
+| ------------------------------ | -------- | --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                 | yes      | Local PostgreSQL connection string            | `postgres://webhook_monitor:webhook_monitor_password@localhost:5432/webhook_monitor` |
+| `POSTGRES_USER`                | yes      | Local PostgreSQL username                     | `webhook_monitor`                                                                    |
+| `POSTGRES_PASSWORD`            | yes      | Local PostgreSQL password                     | `webhook_monitor_password`                                                           |
+| `POSTGRES_DB`                  | yes      | Local PostgreSQL database                     | `webhook_monitor`                                                                    |
+| `POSTGRES_PORT`                | yes      | Local PostgreSQL port                         | `5432`                                                                               |
+| `REDIS_URL`                    | yes      | Local Redis connection string                 | `redis://localhost:6379`                                                             |
+| `API_HOST` / `API_PORT`        | yes      | Local API bind host/port                      | `localhost` / `3000`                                                                 |
+| `STRIPE_SAMPLE_WEBHOOK_SECRET` | yes      | Fake local Stripe-style sample signing secret | `whsec_local_test_secret`                                                            |
+| `REAL_PROVIDER_APIS_ENABLED`   | yes      | Guardrail for real provider API usage         | `false`                                                                              |
 
 ## 5. Daily workflow
 
@@ -109,15 +110,19 @@ git status --short
 
 Replace the placeholders with the actual commands for this project. Delete unused rows.
 
-| Service         | Purpose                    | Start command    | URL / health check |
-| --------------- | -------------------------- | ---------------- | ------------------ |
-| Docker services | Local PostgreSQL and Redis | `pnpm docker:up` | `pnpm docker:ps`   |
+| Service         | Purpose                    | Start command     | URL / health check                                      |
+| --------------- | -------------------------- | ----------------- | ------------------------------------------------------- |
+| Docker services | Local PostgreSQL and Redis | `pnpm docker:up`  | `pnpm docker:ps`                                        |
+| API/dashboard   | Webhook intake and UI      | `pnpm dev:api`    | `http://localhost:3000/health`, `/readyz`, `/dashboard` |
+| Worker          | BullMQ delivery processing | `pnpm dev:worker` | Worker startup log: `Worker started.`                   |
 
 Common command block:
 
 ```powershell
 pnpm docker:up
 pnpm docker:ps
+pnpm dev:api
+pnpm dev:worker
 ```
 
 ## 7. Run tests
@@ -125,7 +130,7 @@ pnpm docker:ps
 Use only the commands that apply.
 
 ```powershell
-pnpm test
+pnpm test -- --run
 ```
 
 ## 8. Run quality gate
@@ -136,7 +141,7 @@ The quality gate should be the default pre-commit validation command.
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test
+pnpm test -- --run
 ```
 
 Expected checks:
@@ -145,32 +150,43 @@ Expected checks:
 - Linting
 - Type checking
 - Unit tests
-- Build check, if applicable
+- Build-equivalent check through `pnpm typecheck`; no root `build` script exists
 
 ## 9. Run smoke tests
 
 Run smoke tests after starting required services and before committing changes that affect runtime behavior.
 
 ```powershell
-docker compose -f .\infra\docker-compose.yml up -d
-docker compose -f .\infra\docker-compose.yml ps
-docker compose -f .\infra\docker-compose.yml down
+pnpm docker:up
+pnpm docker:ps
+pnpm db:migrate
+pnpm demo:reset
+pnpm dev:api
+pnpm dev:worker
+pnpm simulator:all
 ```
 
 Smoke-test target:
 
-| Area       | Command or URL                                    | Expected result                        |
-| ---------- | ------------------------------------------------- | -------------------------------------- |
-| PostgreSQL | `docker compose -f .\infra\docker-compose.yml ps` | `postgres` service is running/healthy. |
-| Redis      | `docker compose -f .\infra\docker-compose.yml ps` | `redis` service is running/healthy.    |
+| Area                  | Command or URL                                | Expected result                                                                      |
+| --------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| PostgreSQL            | `pnpm docker:ps`                              | `postgres` service is running/healthy.                                               |
+| Redis                 | `pnpm docker:ps`                              | `redis` service is running/healthy.                                                  |
+| API liveness          | `http://localhost:3000/health`                | JSON response with `ok: true`.                                                       |
+| API readiness         | `http://localhost:3000/readyz`                | Database and queue dependencies are `ok`.                                            |
+| Dashboard             | `http://localhost:3000/dashboard`             | HTML dashboard renders.                                                              |
+| Events dashboard      | `http://localhost:3000/dashboard/events`      | HTML event list renders.                                                             |
+| Dead-letter dashboard | `http://localhost:3000/dashboard/dead-letter` | HTML dead-letter list renders.                                                       |
+| Simulator             | `pnpm simulator:all`                          | Valid, duplicate, invalid, retry, dead-letter, and manual replay scenarios complete. |
 
 ## 10. Logs
 
-| Source             | How to inspect                   | Notes                         |
-| ------------------ | -------------------------------- | ----------------------------- |
-| Development server | Terminal running the service     | `<what to look for>`          |
-| Tests              | Test command output              | `<where reports are written>` |
-| Docker services    | `docker compose logs --tail=100` | Add service name when useful. |
+| Source          | How to inspect                                                 | Notes                            |
+| --------------- | -------------------------------------------------------------- | -------------------------------- |
+| API server      | Terminal running `pnpm dev:api`                                | Look for `API server listening.` |
+| Worker          | Terminal running `pnpm dev:worker`                             | Look for `Worker started.`       |
+| Tests           | Test command output                                            | Vitest prints file/test counts   |
+| Docker services | `docker compose -f .\infra\docker-compose.yml logs --tail=100` | Add service name when useful.    |
 
 ```powershell
 # All Docker logs
@@ -185,12 +201,13 @@ docker compose -f .\infra\docker-compose.yml logs --tail=100 <service-name>
 
 ## 11. Debugging common issues
 
-| Symptom                      | Likely cause                           | Fix                                                      | Validation                      |
-| ---------------------------- | -------------------------------------- | -------------------------------------------------------- | ------------------------------- |
-| `<symptom>`                  | `<cause>`                              | `<fix>`                                                  | `<command/check>`               |
-| Port already in use          | Previous dev server still running      | Stop the old process or change the port                  | Service starts successfully     |
-| Missing environment variable | `.env` incomplete or not loaded        | Compare `.env` with `.env.example`                       | App starts without config error |
-| Dependency command fails     | Wrong package manager or stale install | Verify tool versions, reinstall dependencies if approved | Tests/quality gate pass         |
+| Symptom                           | Likely cause                                                         | Fix                                                                                                | Validation                                           |
+| --------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Port already in use               | Previous dev server or local DB/Redis using the port                 | Stop only the known process you own or change local port config                                    | Service starts successfully                          |
+| Missing environment variable      | `.env` incomplete or not loaded                                      | Compare `.env` with `.env.example`                                                                 | App starts without config error                      |
+| pnpm unsupported engine warning   | Codex bundled pnpm shim uses an older bundled Node than shell `node` | Use system/Corepack pnpm in manual PowerShell or update Codex runtime; do not lower project engine | `pnpm config list` user agent shows Node `>=24.16.0` |
+| Simulator says API is unreachable | API is not running or wrong base URL                                 | Start `pnpm dev:api`; check `SIMULATOR_API_BASE_URL`                                               | `Invoke-RestMethod http://localhost:3000/health`     |
+| Dependency command fails          | Wrong package manager or stale install                               | Verify tool versions, reinstall dependencies if approved                                           | Tests/quality gate pass                              |
 
 ## 12. Safe stop and reset
 
@@ -200,6 +217,9 @@ docker compose -f .\infra\docker-compose.yml logs --tail=100 <service-name>
 
 # Stop Docker services, if used
 docker compose -f .\infra\docker-compose.yml down
+
+# Reset only local demo/test app data
+pnpm demo:reset
 ```
 
 Do not run the following unless explicitly documented and approved for the current task:

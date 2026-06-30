@@ -14,13 +14,13 @@ type DependencyStatus = "ok" | "unavailable";
 
 export const registerHealthRoutes = (app: ApiApp, dependencies: HealthRouteDependencies): void => {
   const config = dependencies.config;
+  const healthResponse = () => ({
+    ok: true,
+    service: config.serviceName
+  });
 
-  app.get("/healthz", (context) =>
-    context.json({
-      ok: true,
-      service: config.serviceName
-    })
-  );
+  app.get("/health", (context) => context.json(healthResponse()));
+  app.get("/healthz", (context) => context.json(healthResponse()));
 
   app.get("/readyz", async (context) => {
     const dependencyStatuses: {

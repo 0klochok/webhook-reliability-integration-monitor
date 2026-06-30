@@ -254,10 +254,12 @@ authorization, CSRF protection, and deployment hardening.
 ## Health And Readiness
 
 ```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:3000/health"
 Invoke-RestMethod -Method Get -Uri "http://localhost:3000/healthz"
 Invoke-RestMethod -Method Get -Uri "http://localhost:3000/readyz"
 ```
 
+- `GET /health`: process is alive; compatibility alias for common health checks.
 - `GET /healthz`: process is alive.
 - `GET /readyz`: dependencies such as PostgreSQL and Redis are available.
 

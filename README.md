@@ -352,7 +352,7 @@ Detailed scenario notes are in [docs/failure-scenarios.md](docs/failure-scenario
 Use this clean sequence for a portfolio demo:
 
 ```powershell
-Set-Location "C:\Users\alex\Documents\Coding Projects\Portfolio Projects\webhook-reliability-integration-monitor"
+Set-Location "<project-path>"
 pnpm install
 Copy-Item .env.example .env
 docker compose -f .\infra\docker-compose.yml up -d postgres redis
